@@ -269,3 +269,41 @@ trabajo async (mount, fetch, animaciones con estado):** (1) guard contra registr
 listener en `document`/`window`; (2) estado de "qué está montado" anclado al nodo DOM real, no al
 closure del script; (3) si el handler hace CUALQUIER cosa async, encolar invocaciones en vez de
 dejarlas correr en paralelo — los tres son necesarios, cualquiera de los tres solo tapa una parte.
+
+## Error de consola en Gallery — causa raíz real encontrada y corregida (2026-09-15)
+
+El error `Failed to fetch dynamically imported module: astro:scripts/before-hydration.js`,
+anotado antes como "investigado, sin causa raíz confirmada, no bloqueante", SÍ tenía una causa
+raíz real y SÍ afectaba directamente a este catálogo (no era ruido externo de Astro/Vite).
+
+**Causa:** `Galeria.astro` (el componente REAL, en `sitio-cms-mongo`) renderiza
+`<Gallery imageData={...} client:visible />` — un hijo con su propia hidratación de framework
+ANIDADA dentro del componente. Cuando la Container API renderiza este componente para el HTML
+estático del canvas (el tab "Preview", incluso oculto vía `hideCanvasPreview`), el
+`before-hydration-url` que le escribe a ESE `<astro-island>` anidado queda roto — el navegador
+igual intenta `import()`-earlo apenas el custom element se conecta al DOM, sin esperar
+visibilidad (`childrenConnectedCallback` en `astro-island.js` corre el `import` ANTES del gating
+de `client:visible`, sin try/catch alrededor) — confirmado inspeccionando el HTML servido: el
+atributo tenía el specifier SIN resolver, no una URL real. Reproducible tanto en dev (`pnpm dev`)
+como en el build de producción (`pnpm build` + `pnpm preview`) — no era un problema exclusivo del
+dev server.
+
+**Por qué solo Gallery y no otros:** es el único componente de `_library/` cuyo `.astro` real
+hidrata un hijo con `client:*` en su propio template — Modal, Announcement Banner, etc. no tienen
+esa forma. Cualquier componente futuro con el mismo patrón (un `client:*` anidado dentro de otro
+componente) reproduciría el mismo bug al pasar por la Container API.
+
+**Primer intento de fix, INSUFICIENTE:** `canvas.querySelectorAll('astro-island[before-hydration-url]').forEach(el => el.removeAttribute(...))`
+DESPUÉS de `canvas.innerHTML = html`. No funcionó — comprobado empíricamente (el error seguía
+apareciendo). Razón: `customElements` conecta el elemento (y dispara `childrenConnectedCallback`,
+que ya lee y usa el atributo) de forma SÍNCRONA durante el parseo del propio `innerHTML` — la
+línea de `removeAttribute` corre DESPUÉS de que el daño ya se disparó, nunca a tiempo.
+
+**Fix real:** quitar el atributo del STRING de HTML ANTES de asignarlo a `canvas.innerHTML`, en
+`setCanvasHtml()` (`LivePreview.astro`) — `html.replace(/\sbefore-hydration-url="[^"]*"/g, '')` —
+así el navegador nunca ve el atributo roto en primer lugar. Sin efecto funcional real: ese
+`<astro-island>` anidado nunca se esperó que hidrate de verdad dentro del canvas de la Container
+API (la experiencia interactiva real la da el demo bespoke aparte, `GalleryInteractiveDemo.astro`
+para este caso). Verificado: build limpio + `pnpm preview` (producción) + navegador real sin
+ningún error de consola, lightbox de la Hidratación real sigue abriendo correctamente, sin
+regresión en Announcement Banner/Slider/Contact Section/Modal.

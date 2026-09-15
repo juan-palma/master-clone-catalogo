@@ -485,7 +485,35 @@ try {
 		// scripts (inline y externos) terminaron de correr.
 		const executedScripts = new Set<string>();
 		function setCanvasHtml(html: string): Promise<void> {
-			canvas.innerHTML = html;
+			// Causa raíz real de un error de consola en la página de Gallery
+			// (`Failed to fetch dynamically imported module:
+			// astro:scripts/before-hydration.js`), investigada a fondo
+			// (2026-09-15): Galeria.astro (el componente REAL) renderiza
+			// `<Gallery ... client:visible />` — un hijo con su propia
+			// hidratación de framework anidada DENTRO del componente que la
+			// Container API renderiza para el HTML estático de este canvas. La
+			// Container API no resuelve bien el `before-hydration-url` de ESE
+			// `<astro-island>` anidado (queda apuntando a un specifier que el
+			// navegador no puede `import()`-ear tal cual) — y el custom element
+			// lo intenta apenas se conecta al DOM, sin esperar a que sea
+			// visible (`childrenConnectedCallback` en astro-island.js corre
+			// ANTES del gating de `client:visible`), sin try/catch. Sacar el
+			// atributo DESPUÉS de asignar `canvas.innerHTML` no alcanza —
+			// `customElements` conecta (y dispara `childrenConnectedCallback`)
+			// de forma SÍNCRONA durante el parseo del innerHTML, antes de que
+			// la línea siguiente de este script llegue a correr (comprobado:
+			// `removeAttribute` ahí seguía sin evitar el error). Por eso se
+			// quita del STRING, antes de que el navegador vea el markup.
+			// Pasa para cualquier componente de este catálogo que internamente
+			// use un `client:*` en su propio template — hoy solo Gallery, pero
+			// el fix es genérico a propósito. No afecta nada real: este
+			// `<astro-island>` anidado vive dentro de un canvas que además está
+			// oculto (`hideCanvasPreview`) o, si no lo está, nunca se esperó
+			// que sus hijos hidraten de verdad — la experiencia interactiva
+			// real la da el demo bespoke aparte (ver GalleryInteractiveDemo.astro).
+			const safeHtml = html.replace(/\sbefore-hydration-url="[^"]*"/g, '');
+			canvas.innerHTML = safeHtml;
+
 			const pending: Promise<void>[] = [];
 			canvas.querySelectorAll('script').forEach((oldScript) => {
 				const key = oldScript.getAttribute('src') || oldScript.textContent || '';

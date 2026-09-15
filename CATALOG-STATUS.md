@@ -94,11 +94,8 @@ derecha).
 - Slider tiene una limitación conocida documentada en su propia página (deformación de imagen
   sin `settings.absolutePosition` activo) — pendiente para una revisión futura del componente
   real, no algo a resolver en el catálogo.
-- **Error de consola en la página de Gallery** (`Failed to fetch dynamically imported module:
-  astro:scripts/before-hydration.js`), reproducible incluso con dev server limpio — investigado
-  y descartado como causado por el fix de scripts embebidos de 2026-09-15 (`Galeria.astro` no
-  tiene `<script>` propio, ese camino no se activa para su canvas; Announcement Banner, que monta
-  el mismo `<Modal client:load />`, no tiene el error; tampoco se repitió en Branches ni
-  WhatsAppFab). No bloquea el uso real del preview (funciona visualmente), pero queda sin causa
-  raíz confirmada.
+- ~~Error de consola en la página de Gallery~~ — **resuelto** (2026-09-15). Causa raíz real:
+  `Galeria.astro` hidrata un `<Gallery client:visible />` anidado, y la Container API le arma un
+  `before-hydration-url` roto a ESE `<astro-island>` interno. Fix en `LivePreview.astro`
+  (`setCanvasHtml`) — ver `.knowledge/live-preview-architecture.md`.
 - Sin repo git todavía — en proceso (usuario creando el remoto).
