@@ -63,14 +63,44 @@ import Modal from '../../../sitio-cms-mongo/site/src/_library/modal/Modal.svelte
 	// desde afuera.
 	import { mount, unmount } from 'svelte';
 
-	let instance: Record<string, unknown> | null = null;
 	let GalleryClass: any = null;
 
-	async function mountGallery(images: { url: string; width: number; height: number; alt?: string }[]) {
-		const canvas = document.querySelector<HTMLDivElement>('.gid-canvas')!;
-		if (instance) {
-			unmount(instance);
-			instance = null;
+	// El estado de "qué instancia está montada" vive COLGADO DEL NODO DEL
+	// CANVAS (no en una variable de closure de este <script>) a propósito:
+	// bug real encontrado (2026-09-15) — este script se puede re-ejecutar más
+	// de una vez sin que el navegador recargue la página de verdad (HMR de
+	// Vite durante una sesión de edición activa, o cualquier otro mecanismo
+	// futuro que vuelva a correr el mismo <script>), y cada ejecución tiene su
+	// PROPIA variable `instance` en closure — sin un ancla compartida, cada
+	// ejecución "no sabe" que otra ya montó algo, así que ninguna hace
+	// `unmount()` de las demás: se pisan agregando (Svelte `mount()` con un
+	// `target` no vacío no reemplaza el contenido previo, lo agrega al final)
+	// y la grilla real termina apareciendo 2, 3... N veces apiladas. Guardar
+	// el instance en el propio DOM (`canvas.__galleryInstance`) hace que
+	// CUALQUIER ejecución de este script, sin importar cuántas veces se haya
+	// registrado por error, siempre vea y desmonte la instancia anterior real
+	// antes de montar la nueva — a prueba de duplicados sin depender de que
+	// el guard de abajo cubra cada caso futuro.
+	// Ni el ancla en el DOM de arriba alcanza sola: si `mountGallery` se llama
+	// dos veces seguidas ANTES de que la primera llamada termine su propio
+	// `unmount()`+`import()`+`mount()` (ej. dos ediciones rápidas de controles,
+	// o el propio test de este fix disparando el evento 3 veces sin esperar) —
+	// ambas llamadas leen `canvas.__galleryInstance` como vacío en el mismo
+	// instante (ninguna vio lo que la otra estaba a punto de montar), así que
+	// ninguna desmonta a la otra: mismo resultado visual (grilla duplicada)
+	// que el bug original, pero por una carrera async, no por un listener de
+	// más. Fix: encolar — cada llamada espera a que la anterior termine antes
+	// de empezar la suya, sin importar cuántas lleguen ni qué tan rápido.
+	let mountQueue: Promise<void> = Promise.resolve();
+	function mountGallery(images: { url: string; width: number; height: number; alt?: string }[]): void {
+		mountQueue = mountQueue.then(() => mountGalleryNow(images)).catch((err) => console.error('[GalleryInteractiveDemo]', err));
+	}
+
+	async function mountGalleryNow(images: { url: string; width: number; height: number; alt?: string }[]) {
+		const canvas = document.querySelector<HTMLDivElement & { __galleryInstance?: Record<string, unknown> | null }>('.gid-canvas')!;
+		if (canvas.__galleryInstance) {
+			unmount(canvas.__galleryInstance);
+			canvas.__galleryInstance = null;
 		}
 
 		if (!images || images.length === 0) {
@@ -89,10 +119,10 @@ import Modal from '../../../sitio-cms-mongo/site/src/_library/modal/Modal.svelte
 		// el prop en el mismo instance, porque Gallery.svelte arma sus
 		// animaciones GSAP una sola vez en `onMount` a partir del grid inicial;
 		// si solo cambiara el prop, las imágenes agregadas después no se animarían.
-		instance = mount(GalleryClass, { target: canvas, props: { imageData: images } });
+		canvas.__galleryInstance = mount(GalleryClass, { target: canvas, props: { imageData: images } });
 	}
 
-	document.addEventListener('livepreview:update', ((e: CustomEvent) => {
+	function handleUpdate(e: CustomEvent) {
 		if (e.detail?.id !== 'gallery') return;
 		// `e.detail.props` son los valores CRUDOS de los controles (los mismos
 		// que se mandan a /api/render/[id]) — no el shape ya armado por
@@ -103,5 +133,16 @@ import Modal from '../../../sitio-cms-mongo/site/src/_library/modal/Modal.svelte
 		const raw = (e.detail.props?.galleryImages ?? []) as { url: string; width: number; height: number }[];
 		const images = raw.map((img, i) => ({ ...img, alt: `Imagen de galería ${i + 1}` }));
 		mountGallery(images);
-	}) as EventListener);
+	}
+
+	// Guard adicional (además del ancla en el DOM de arriba): evita que este
+	// script se registre más de una vez en `document` si llega a re-ejecutar
+	// sin recarga completa — sin esto, cada ejecución de más deja un listener
+	// huérfano acumulado para siempre (fuga de memoria silenciosa, aunque ya
+	// no cause duplicados visibles gracias al fix de arriba).
+	const w = window as unknown as { __galleryDemoWired?: boolean };
+	if (!w.__galleryDemoWired) {
+		w.__galleryDemoWired = true;
+		document.addEventListener('livepreview:update', handleUpdate as EventListener);
+	}
 </script>

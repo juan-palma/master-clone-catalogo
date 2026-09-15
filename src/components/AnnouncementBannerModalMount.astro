@@ -30,10 +30,25 @@ import Modal from '../../../sitio-cms-mongo/site/src/_library/modal/Modal.svelte
 		};
 	}
 
-	document.addEventListener('livepreview:update', ((e: CustomEvent) => {
+	function handleUpdate(e: CustomEvent) {
 		if (e.detail?.id !== 'announcement-banner') return;
 		wireClick(e.detail.shadow);
-	}) as EventListener);
+	}
+
+	// Guard: evita registrar este listener más de una vez si el script llega a
+	// re-ejecutar sin recarga completa de página (HMR de Vite durante una
+	// sesión de edición activa) — sin esto, cada ejecución de más deja un
+	// listener huérfano acumulado en `document` para siempre. Hoy es
+	// inofensivo en el resultado visible (wireClick solo hace `btn.onclick =
+	// ...`, una asignación que se sobreescribe sola sin acumular), pero es
+	// trabajo repetido de más y una fuga de memoria silenciosa — mismo fix que
+	// GalleryInteractiveDemo.astro, donde el mismo patrón SÍ causaba
+	// duplicados visibles reales.
+	const w = window as unknown as { __announcementBannerDemoWired?: boolean };
+	if (!w.__announcementBannerDemoWired) {
+		w.__announcementBannerDemoWired = true;
+		document.addEventListener('livepreview:update', handleUpdate as EventListener);
+	}
 
 	// El primer render (antes de tocar ningún control) dispara
 	// 'livepreview:update' desde el <script> de LivePreview.astro, que

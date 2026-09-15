@@ -222,3 +222,50 @@ Contact Section y hacer submit ahora muestra el mensaje de error inline document
 (404) — el `:::caution` de `contact-section.mdx` ya describía este comportamiento correctamente
 (se escribió anticipando el fix, no hizo falta tocarlo). Sin regresión en Announcement Banner,
 Modal, Slider ni la home (sin errores de consola nuevos en ninguna).
+
+## Demos bespoke con `document.addEventListener('livepreview:update', ...)` — dos bugs reales de duplicación (2026-09-15)
+
+`GalleryInteractiveDemo.astro`, `AnnouncementBannerModalMount.astro` y `SliderParallaxDemo.astro`
+comparten el mismo patrón: un `<script>` de página normal (no inyectado por `LivePreview.astro`)
+que registra un listener GLOBAL en `document` para reaccionar a cada `livepreview:update` del
+canvas de arriba. Reportado por el usuario: "la galería se ve 3 veces repetida" — un usuario real
+la vio duplicada, algo que no pasaba cuando se construyó originalmente. Investigado y confirmado:
+dos bugs reales distintos, ambos de concurrencia, ninguno relacionado con el fix de scripts
+embebidos de la sección anterior (`Galeria.astro` no tiene `<script>` propio).
+
+**Bug 1 — el `<script>` de la página se puede re-ejecutar sin recarga completa** (HMR de Vite
+durante una sesión de edición activa es el sospechoso principal, aunque no se aisló la causa
+exacta) **y cada ejecución registra OTRO listener en `document`, sin quitar el anterior.** Con N
+listeners acumulados, un solo evento real dispara N llamadas a `mountGallery()` — y como cada
+ejecución del script tenía su PROPIA variable `instance` en closure, ninguna sabía que otra ya
+había montado algo, así que ninguna hacía `unmount()` de las demás (Svelte `mount()` con un
+`target` no vacío AGREGA al final, no reemplaza). Fix: mover el estado "qué instancia está
+montada" del closure del script al propio nodo DOM (`canvas.__galleryInstance`) — así CUALQUIER
+ejecución del script, sin importar cuántas veces se haya registrado por error, ve y desmonta la
+instancia real anterior antes de montar la nueva. Además, un guard (`window.__galleryDemoWired`)
+evita que se sigan acumulando listeners huérfanos hacia adelante (fuga de memoria silenciosa,
+aparte del bug visual). Mismo par de fixes aplicado a los otros dos archivos por higiene, aunque
+ahí el síntoma visual nunca se manifestó (`wireClick` solo hace `btn.onclick = ...`, una
+asignación que se auto-sobreescribe; `wireParallax` mata el `ScrollTrigger` anterior por `id`
+antes de crear uno nuevo) — ambos son idempotentes ante llamadas repetidas, Gallery no lo era.
+
+**Bug 2, más profundo — encontrado AL VERIFICAR el fix del Bug 1:** con un solo listener
+correctamente registrado (guard funcionando), disparar el mismo evento 3 veces seguidas SIN
+esperar (ej. 3 `dispatchEvent` en loop, simulando ediciones rápidas de controles) **igual producía
+3 grillas duplicadas.** Causa: `mountGallery` es `async` (espera el `import()` dinámico de
+`Gallery.svelte` en su primera llamada) — si se llama dos veces antes de que la primera termine su
+propio `unmount()`→`import()`→`mount()`, AMBAS llamadas leen `canvas.__galleryInstance` vacío en
+el mismo instante (ninguna vio lo que la otra estaba a punto de montar) y ninguna desmonta a la
+otra — el fix del Bug 1 (ancla en el DOM) no alcanza si las lecturas/escrituras de esa ancla
+ocurren de forma intercalada, no una-después-de-otra. Esto puede pasar en uso normal, no solo en
+un test de estrés: cualquier ráfaga de eventos `livepreview:update` para el mismo `id` (varias
+ediciones de controles en sucesión rápida) es candidata. Fix: encolar las llamadas
+(`mountQueue = mountQueue.then(() => mountGalleryNow(images))`) — cada invocación espera a que la
+anterior termine por completo antes de empezar la suya, sin importar cuántas lleguen ni qué tan
+rápido. Verificado disparando el evento 3 veces seguidas sin esperar: 1 sola grilla, correcta.
+
+**Patrón general para cualquier demo bespoke futuro que reaccione a `livepreview:update` con
+trabajo async (mount, fetch, animaciones con estado):** (1) guard contra registro duplicado del
+listener en `document`/`window`; (2) estado de "qué está montado" anclado al nodo DOM real, no al
+closure del script; (3) si el handler hace CUALQUIER cosa async, encolar invocaciones en vez de
+dejarlas correr en paralelo — los tres son necesarios, cualquiera de los tres solo tapa una parte.
