@@ -1,0 +1,67 @@
+---
+title: "Modal / Dialog"
+description: "Modal/dialog genérico controlado por código, usado por Announcement Banner, Contact Section, Gallery y avisos legales."
+---
+
+import ModalPreview from '../../../components/ModalPreview.astro';
+
+:::tip[Base reutilizable, no un contrato]
+Esto es un punto de partida genérico y probado — en la práctica, la mayoría de proyectos de cliente ajustan diseño y/o campos antes de usarlo. Sirve para decidir con qué arrancar, no para asumir que se va a usar tal cual.
+:::
+
+**Última actualización:** 2026-09-14
+**Versión:** 1.0.0
+**Estado:** ✅ Requerido por otros features (Announcement Banner, Contact Section, Gallery, avisos legales) — no tiene toggle propio, siempre está disponible.
+
+---
+
+## ¿Qué es?
+
+Una ventana emergente (modal) genérica y animada, controlada por código (no tiene su propio campo en el CMS). Cualquier parte del sitio puede abrirla llamando a la función `openPopup()` del store compartido — se usa para avisos legales, zoom de imágenes, y el contenido de banners/anuncios.
+
+---
+
+## ¿Cuándo usarlo?
+
+- ✅ Mostrar un aviso de privacidad o política al hacer clic en un link del footer
+- ✅ Ampliar una imagen al hacer clic (zoom)
+- ✅ Mostrar el contenido de un Announcement Banner al hacer clic en su botón
+
+**No lo uses si:**
+- ❌ Necesitas un formulario complejo con su propia URL — mejor una página aparte
+
+---
+
+## Cómo activarlo
+
+Siempre disponible, no requiere activación. El componente `<Modal client:idle />` ya está montado a nivel de página (`pages/es-MX/index.astro`, `pages/en-US/index.astro`).
+
+---
+
+## Parámetros (función `openPopup()`)
+
+No tiene campos en el CMS — sus "parámetros" son el objeto que le pasas al llamarla desde código:
+
+| Parámetro | Tipo | Descripción | Requerido |
+|---|---|---|---|
+| **title** | string | Título mostrado arriba del contenido | ❌ No |
+| **content** | string (HTML) | Cuerpo del modal — acepta HTML (`{@html}` por dentro) | ❌ No |
+| **call** | string (URL) | Si se define, agrega un botón de acción con este link | ❌ No |
+| **className** | string | Clase CSS extra en `.popupInfo`, para casos especiales | ❌ No |
+
+`closePopup()` (sin parámetros) lo cierra por código — normalmente no hace falta, el usuario ya
+puede cerrarlo con la X o haciendo clic fuera.
+
+---
+
+## Preview, uso y código
+
+<ModalPreview />
+
+---
+
+## Notas técnicas
+
+- Componente Svelte (`site/src/_library/modal/Modal.svelte`), animado con GSAP.
+- El store (`site/src/stores/popup.js` — `openPopup`/`closePopup`/`requestClosePopup`) es infraestructura transversal compartida, NO vive dentro de `_library/modal/` — lo usan también `ElementListBanners.astro` y `Gallery.svelte`.
+- Los links con `[data-notice="slug"]` (avisos legales del footer) y las imágenes con `data-pop` están wireados en `Layout.astro` para abrir el modal automáticamente.

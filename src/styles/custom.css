@@ -1,0 +1,54 @@
+/*
+ * Overrides mínimos y explícitos al tema de Starlight — mecanismo oficial
+ * (customCss en astro.config.mjs), no un parche por fuera.
+ */
+
+:root {
+	/*
+	 * Default de Starlight: 45rem. En monitores anchos, la columna derecha
+	 * ("En esta página") se calcula para ocupar TODO el espacio sobrante más
+	 * allá de este ancho — mientras más angosto el contenido, más gigante y
+	 * vacía se ve esa columna. Se sube para que el contenido (lo único con
+	 * información real) domine el espacio disponible.
+	 */
+	--sl-content-width: 60rem;
+}
+
+/*
+ * Starlight le pone isolation:isolate a .main-pane (ver TwoColumnContent.astro
+ * de @astrojs/starlight) — crea un contexto de apilamiento nuevo que atrapa
+ * cualquier z-index de acá adentro (incluido el de Modal.svelte, z-index:
+ * 10000) por debajo de la columna derecha ("En esta página"), que vive FUERA
+ * de .main-pane. Sin esto, el botón de cerrar del Modal en el preview no
+ * recibe clicks donde se solapa con esa columna. Bug real encontrado
+ * 2026-09-14 al construir el preview de Modal — no aplica al sitio real
+ * (sitio-cms-mongo no tiene ningún ancestro con isolation/transform/contain
+ * alrededor de <Modal client:idle />), es específico de embeber el
+ * componente real dentro del layout de este catálogo.
+ */
+.main-pane {
+	isolation: auto;
+}
+
+/*
+ * Starlight reparte TODO el espacio sobrante del viewport en dos mitades:
+ * la mitad ensancha .right-sidebar-container más allá de lo que su propio
+ * contenido (el índice "En esta página") necesita, y la otra mitad queda
+ * como margin-inline-start:auto del contenido (margin-inline-end:0 fijo) —
+ * o sea, empuja el contenido a pegarse contra el TOC en vez de centrarlo.
+ * En monitores anchos eso se ve exactamente como se reportó: TOC con aire
+ * vacío a su derecha, y contenido con más aire a su izquierda que a su
+ * derecha. Se fija el TOC a su ancho real (el mismo que el nav izquierdo,
+ * para simetría) y se centra el contenido en el espacio que sobra entre
+ * ambos, en vez de pegarlo contra el TOC.
+ */
+@media (min-width: 72rem) {
+	.right-sidebar-container {
+		width: var(--sl-sidebar-width);
+	}
+
+	[data-has-sidebar][data-has-toc] .main-pane {
+		width: calc(100% - var(--sl-sidebar-width));
+		--sl-content-margin-inline: auto;
+	}
+}

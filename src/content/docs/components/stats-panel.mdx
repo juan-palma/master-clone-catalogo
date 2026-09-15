@@ -1,0 +1,88 @@
+---
+title: "Stats / Metrics Panel"
+description: "Panel de checklist + dashboard de indicadores, pensado para resultados de análisis o métricas de negocio."
+---
+
+import LivePreview from '../../../components/LivePreview.astro';
+
+:::tip[Base reutilizable, no un contrato]
+Esto es un punto de partida genérico y probado — en la práctica, la mayoría de proyectos de cliente ajustan diseño y/o campos antes de usarlo. Sirve para decidir con qué arrancar, no para asumir que se va a usar tal cual.
+:::
+
+**Última actualización:** 2026-09-14
+**Versión:** 1.0.0
+**Estado:** ⏳ Sin campo activo en el CMS de este Master Clone todavía
+
+---
+
+## ¿Qué es?
+
+Un panel de dos columnas: checklist de puntos + texto de un lado, un "dashboard" de indicadores
+(filas con etiqueta/valor/estado) del otro. Pensado para mostrar resultados, métricas o un
+análisis de diagnóstico.
+
+---
+
+## ¿Cuándo usarlo?
+
+- ✅ Mostrar resultados de un análisis o auditoría
+- ✅ Presentar métricas/indicadores clave del negocio
+- ✅ Checklist de "qué revisamos" + resultado
+
+**No lo uses si:**
+- ❌ Solo necesitas texto simple sin datos estructurados
+
+---
+
+## Cómo activarlo
+
+Este feature no tiene un campo montado en ningún global de este Master Clone hoy — el componente
+en `site/src/_library/stats-panel/` está listo, pero falta:
+
+1. Agregar un campo (ej. `statsPanel`, con la forma de `data` que se ve abajo) al global donde
+   quieras montarlo (ej. `PageHome.ts`).
+2. `pnpm payload generate:types`.
+3. Pasar ese campo como `data` a `<StatsPanel id="stats-panel" data={data} />`.
+
+---
+
+## Parámetros (`data` que recibe `StatsPanel.astro`)
+
+:::note[🔁 `items[]` y `dashboard[]` son de varios — sin límite fijo]
+Ambos son campos `hasMany` reales del CMS: se pueden agregar tantos elementos del checklist y
+filas del panel como se necesiten, quitar cualquiera, y reordenarlos (arrastrando en el admin de
+Payload) — no hay un número fijo. El preview de abajo tiene un "+ Agregar" independiente para
+cada uno.
+:::
+
+| Parámetro | Tipo | Descripción | Requerido |
+|---|---|---|---|
+| **saludo** | string | Etiqueta corta arriba del título | ❌ No |
+| **h2** | string | Título de la sección | ❌ No |
+| **text** | richText | Texto de introducción (varios párrafos) | ❌ No |
+| **items[]** 🔁 | array (`hasMany`) | Checklist — cualquier cantidad | ❌ No |
+| **items[].text** | string | Elemento del checklist (texto plano, no richText) | ❌ No |
+| **resultado** | string | Resultado/cita destacada | ❌ No |
+| **cta_text / cta_link** | string | Botón opcional — necesita ambos para mostrarse | ❌ No |
+| **dashboard_label** | string | Etiqueta arriba del panel de la derecha | ❌ No |
+| **dashboard[]** 🔁 | array (`hasMany`) | Filas del panel — cualquier cantidad | ❌ No |
+| **dashboard[].label** | string | Etiqueta de la fila (ej. "Uptime") | ❌ No |
+| **dashboard[].value** | string | Valor de la fila (ej. "99.9%") | ❌ No |
+| **dashboard[].status** | select (`good` / `warn` / `bad`) | Color del valor | ❌ No |
+
+---
+
+## Preview, uso y código
+
+<LivePreview id="stats-panel" height={420} />
+
+---
+
+## Notas técnicas
+
+- `site/src/_library/stats-panel/` tiene `StatsPanel.astro` (único archivo — sin JS de cliente) +
+  `StatsPanel.css`.
+- El checklist es intencionalmente de una sola columna (no un grid multi-columna) — es una lista,
+  no tarjetas.
+- En mobile las dos columnas colapsan a una, en el mismo orden del HTML (texto+checklist primero,
+  panel después) — no hay `order` que reacomode cuál va arriba.

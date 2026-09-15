@@ -1,0 +1,63 @@
+---
+title: "Circular Rotating Badge (Hero Badge)"
+description: "Insignia circular con texto rotativo, pensada como acompañamiento decorativo del hero de inicio."
+---
+
+import LivePreview from '../../../components/LivePreview.astro';
+
+:::tip[Base reutilizable, no un contrato]
+Esto es un punto de partida genérico y probado — en la práctica, la mayoría de proyectos de cliente ajustan diseño y/o campos antes de usarlo. Sirve para decidir con qué arrancar, no para asumir que se va a usar tal cual.
+:::
+
+**Última actualización:** 2026-09-01
+**Versión:** 1.0.0
+**Estado:** ⏳ Inactivo por defecto — se activa desde el admin
+
+---
+
+## ¿Qué es?
+
+Una insignia circular con texto que gira lentamente, pensada para acompañar el hero de la página de inicio (ej. "Nuevo" / "100% artesanal" / "Envío gratis"). Es un detalle decorativo, no un componente de contenido principal.
+
+---
+
+## ¿Cuándo usarlo?
+
+- ✅ Quieres destacar un mensaje corto y llamativo cerca del hero
+- ✅ El diseño de la marca se beneficia de un elemento circular/rotativo
+
+**No lo uses si:**
+- ❌ El mensaje es largo o necesita más de unas pocas palabras
+- ❌ El hero ya está visualmente cargado — puede sumar ruido
+
+---
+
+## Cómo activarlo
+
+Toggle del admin (global `ui-elements` → `heroBadge`), no de `library.config.json`:
+
+1. Panel admin → **UI Elements**
+2. Activa **"Activar insignia hero"**
+3. Escribe el texto de la insignia
+
+---
+
+## Parámetros (global `ui-elements` → `heroBadge`)
+
+| Parámetro | Tipo | Descripción | Requerido |
+|---|---|---|---|
+| **enabled** | boolean | Activa/desactiva la insignia | ✅ Sí |
+| **text** | string (localizado) | Texto que gira dentro del círculo | ✅ Sí (si está activo) |
+
+---
+
+## Preview, uso y código
+
+<LivePreview id="hero-badge" height={260} />
+
+---
+
+## Notas técnicas
+
+- Ya está wireado en `Inicio.astro` (el hero de la home).
+- Componente: `site/src/_library/hero-badge/`.

@@ -1,0 +1,107 @@
+---
+// Demo de hidratación real de Gallery.svelte — a diferencia del "Preview" de
+// arriba (LivePreview.astro: Container API + Shadow DOM, HTML estático sin
+// <script> de cliente), esto monta el componente Svelte REAL con su propio
+// ciclo de vida (onMount → GSAP ScrollTrigger de las columnas, clic → lightbox
+// real vía el store compartido de Modal) — el segundo caso bespoke de este
+// tipo después de Modal (ver ModalPreview.astro).
+//
+// Se monta manualmente (`new Component({ target, props })`, no un directive
+// `client:*` de Astro) porque necesita re-renderizar con props NUEVOS cada vez
+// que cambian las imágenes del preview de arriba, sin recargar la página — un
+// Astro Island fija sus props en el momento del SSR, no está pensado para
+// recibirlos de nuevo desde afuera después de hidratado.
+//
+// Vive en DOM normal (no Shadow DOM): el lightbox real (Modal.svelte) es un
+// overlay fixed a todo el viewport — dentro de un shadow root pierde ese
+// posicionamiento (ver `isolation:isolate` en astro-starlight-gotchas.md). El
+// grid de Gallery.svelte no lo necesita de todas formas: su único <style> es
+// scoped por el compilador de Svelte, autocontenido sin depender de main.css.
+import Modal from '../../../sitio-cms-mongo/site/src/_library/modal/Modal.svelte';
+---
+
+<div class="gallery-interactive-demo not-content">
+	<div class="gid-canvas"></div>
+	<Modal client:load />
+</div>
+<p class="lp-caption">
+	Componente real hidratado (no HTML estático) — el scroll de esta página anima las columnas
+	igual que en el sitio, y el clic abre el lightbox real (mismo <code>Modal</code> que usa el
+	resto del sitio). Sube imágenes en el tab Preview de arriba para verlo con contenido real.
+</p>
+
+<style>
+	.gallery-interactive-demo {
+		--ida-color-main-first: #e27722;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.5rem;
+		padding: 1rem;
+	}
+	.gid-canvas {
+		min-height: 4rem;
+	}
+	.gid-empty {
+		font-size: 0.85rem;
+		opacity: 0.7;
+		text-align: center;
+		padding: 1rem;
+	}
+	.lp-caption {
+		font-size: 0.8rem;
+		opacity: 0.7;
+		margin-top: 0.25rem;
+	}
+</style>
+
+<script>
+	// Svelte 5 (compilado en modo runes, que es lo que produce el compilador
+	// que trae este catálogo) ya NO soporta `new Component({target, props})`
+	// (API de clase de Svelte 4) — lanza "component_api_invalid_new". El
+	// reemplazo imperativo real es `mount()`/`unmount()` del paquete `svelte`.
+	// Gallery.svelte sigue escrito en sintaxis legacy (`export let imageData`)
+	// pero el compilador lo sigue aceptando igual, solo cambia cómo se monta
+	// desde afuera.
+	import { mount, unmount } from 'svelte';
+
+	let instance: Record<string, unknown> | null = null;
+	let GalleryClass: any = null;
+
+	async function mountGallery(images: { url: string; width: number; height: number; alt?: string }[]) {
+		const canvas = document.querySelector<HTMLDivElement>('.gid-canvas')!;
+		if (instance) {
+			unmount(instance);
+			instance = null;
+		}
+
+		if (!images || images.length === 0) {
+			canvas.innerHTML = '<p class="gid-empty">Sube imágenes en el preview de arriba para ver la grilla real acá.</p>';
+			return;
+		}
+		canvas.innerHTML = '';
+
+		if (!GalleryClass) {
+			// Import cross-repo directo del mismo componente real (nunca copiado) —
+			// mismo patrón de ruta que usa component-registry.ts.
+			GalleryClass = (await import('../../../sitio-cms-mongo/site/src/_library/gallery/Gallery.svelte'))
+				.default;
+		}
+		// Se re-crea completo en cada cambio (unmount + mount), no se actualiza
+		// el prop en el mismo instance, porque Gallery.svelte arma sus
+		// animaciones GSAP una sola vez en `onMount` a partir del grid inicial;
+		// si solo cambiara el prop, las imágenes agregadas después no se animarían.
+		instance = mount(GalleryClass, { target: canvas, props: { imageData: images } });
+	}
+
+	document.addEventListener('livepreview:update', ((e: CustomEvent) => {
+		if (e.detail?.id !== 'gallery') return;
+		// `e.detail.props` son los valores CRUDOS de los controles (los mismos
+		// que se mandan a /api/render/[id]) — no el shape ya armado por
+		// `buildProps` (eso pasa server-side, el cliente nunca lo ve). El campo
+		// `alt` se agrega acá porque `processImageData` (dentro de
+		// Gallery.svelte) lo espera, igual que hace `buildProps` del lado
+		// servidor para el preview estático de arriba.
+		const raw = (e.detail.props?.galleryImages ?? []) as { url: string; width: number; height: number }[];
+		const images = raw.map((img, i) => ({ ...img, alt: `Imagen de galería ${i + 1}` }));
+		mountGallery(images);
+	}) as EventListener);
+</script>

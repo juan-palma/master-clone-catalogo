@@ -1,0 +1,106 @@
+---
+title: "Branches / Locations"
+description: "Sucursales/ubicaciones de negocio: nombre, dirección, mapa embebido y contactos propios por sucursal. Inactivo por defecto."
+---
+
+import LivePreview from '../../../components/LivePreview.astro';
+
+:::tip[Base reutilizable, no un contrato]
+Esto es un punto de partida genérico y probado — en la práctica, la mayoría de proyectos de cliente ajustan diseño y/o campos antes de usarlo. Sirve para decidir con qué arrancar, no para asumir que se va a usar tal cual.
+:::
+
+**Última actualización:** 2026-09-15
+**Versión:** 1.1.0
+**Estado:** ❌ Inactivo por defecto (`library.config.json` → `"branches": false`)
+
+---
+
+## ¿Qué es?
+
+Sucursales/ubicaciones de negocio: nombre, dirección (richText), mapa embebido (iframe) y
+contactos propios de cada sucursal (email/teléfono/WhatsApp) — independientes de los contactos
+generales del sitio.
+
+**Diferencia clave con los demás componentes de este catálogo:** `data` no es un campo anidado
+dentro de otro doc — es una **collection real de Payload** (`branche`, físicamente `branches` en
+Mongo) conectada al global `footer` vía un campo `branches` (relationship, `hasMany`). El
+componente recibe el array completo de sucursales activas, no un subconjunto embebido.
+
+---
+
+## ¿Cuándo usarlo?
+
+- ✅ El cliente tiene más de una ubicación física (tiendas, oficinas, sucursales)
+- ✅ Cada ubicación necesita su propio mapa y/o sus propios datos de contacto
+
+**No lo uses si:**
+- ❌ El negocio tiene una sola ubicación — usa **Contact Section** en vez de esto.
+
+---
+
+## Cómo activarlo
+
+1. `library.config.json` → `"branches": true` (requiere regenerar tipos: `pnpm payload
+   generate:types`)
+2. Crear sucursales en el panel admin → collection **Sucursales**
+3. Panel admin → global **Footer** → relacionar las sucursales que deban aparecer
+
+Si no hay ninguna sucursal relacionada, la sección **no renderiza nada** — no deja cajas vacías.
+
+---
+
+## Parámetros (collection `branche` + global `footer`)
+
+:::note[🔁 `data` (sucursales) y `contacts[]` (por sucursal) son de varios — sin límite fijo]
+`data` es la collection `branche` completa (cualquier cantidad de sucursales). Cada sucursal
+tiene a su vez su propio `contacts[]`, otro campo `hasMany` (relación a `Contacts`) — igual que en
+Contact Section, pero **por sucursal**, no compartido. El preview de abajo demuestra agregar/
+quitar sucursales; los contactos de cada una se muestran con datos de ejemplo fijos (ver Notas
+técnicas).
+:::
+
+| Parámetro | Tipo | Descripción | Requerido |
+|---|---|---|---|
+| **data[]** 🔁 | array (`hasMany`) | Sucursales — cualquier cantidad (collection `branche`) | ❌ No |
+| **data[].name** | string | Nombre de la sucursal | ❌ No |
+| **data[].address** | richText | Dirección | ❌ No |
+| **data[].mapUrl** | string | URL de un mapa embebido (`<iframe src>`) | ❌ No |
+| **data[].contacts[]** 🔁 | array (`hasMany`) | Contactos propios de esa sucursal (relación a `Contacts`) | ❌ No |
+| **data[].contacts[].type** | select (`email` / `phone` / `whatsapp`) | Determina el ícono y el link (`mailto:`/`tel:`/`wa.me`) | ❌ No |
+| **data[].contacts[].text** | string | Etiqueta visible (ej. "Escríbenos") | ❌ No |
+| **data[].contacts[].value** | string | El correo/teléfono en sí | ❌ No |
+| **contactsLabel** | string | Etiqueta sobre la lista de contactos de cada sucursal (viene de `footer.branchesContactsLabel`) | ❌ No |
+
+---
+
+## Preview, uso y código
+
+<LivePreview id="branches" height={420} />
+
+:::caution[Los contactos de cada sucursal son un fixture fijo en este preview]
+`data[].contacts[]` es un `hasMany` DENTRO de otro `hasMany` (sucursales) — el control genérico
+de este catálogo solo soporta un nivel de anidamiento, así que acá se muestran 2 contactos de
+ejemplo fijos por sucursal, no editables desde este preview. **No es una limitación real de
+Payload** — el admin real sí permite editar contactos por sucursal sin problema, esto es nada más
+una limitación de esta herramienta de documentación.
+:::
+
+---
+
+## Notas técnicas
+
+- `site/src/_library/branches/` tiene `Branches.astro` (sin `<script>` propio) + `Branches.css`.
+- `cms/src/_library/branches/` tiene `collection.ts` (slug `branche`, físicamente `branches` en
+  Mongo — Payload pluraliza) y `global-section.ts` (agrega `branches` y `branchesContactsLabel`
+  como campos de nivel **superior** del global `footer`, no anidados en `body.footer` — limitación
+  de `libraryPlugin()`, que solo hace append a fields de nivel superior).
+- Depende de la collection `Contacts` (mismo tipo de dato que usa Contact Section) y recomienda
+  tener **Contact Section** activo también, aunque no es obligatorio.
+- Diseñado triangulando contra `sitio-cms-demo`: ahí las sucursales viven embebidas dentro de
+  `Contacto.astro`; acá es su propio componente independiente, consistente con el resto de
+  `_library/`.
+- Grid `repeat(auto-fit, minmax(280px, 1fr))` — a diferencia de Process Steps/Quote Grid, una
+  cantidad incompleta de sucursales no necesita un fix de centrado: `auto-fit` ya estira las
+  tarjetas existentes para ocupar el ancho disponible en vez de dejarlas pegadas a la izquierda.
+- Sin mapa embebido por defecto (`mapUrl` vacío) — pega cualquier URL de "Insertar mapa" de
+  Google Maps (o similar) en el control de arriba para ver el `<iframe>` real.

@@ -1,0 +1,61 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { getCollection } from 'astro:content';
+
+// Leído en vivo de sitio-cms-mongo/cms/src/_library/*/manifest.json en cada
+// build/dev (ver src/content.config.ts) — nunca es una copia. Si esta tabla
+// no coincide con lo que ves en el master-clone, corre `pnpm dev` de nuevo:
+// puede que el dato haya cambiado y el cache de Vite no se haya refrescado.
+const manifests = (await getCollection('libraryManifests')).sort((a, b) => {
+	const cat = (a.data.category ?? '').localeCompare(b.data.category ?? '');
+	return cat !== 0 ? cat : a.data.id.localeCompare(b.data.id);
+});
+---
+
+<StarlightPage
+	frontmatter={{
+		title: 'Estado en vivo de _library/',
+		description:
+			'Tabla generada leyendo manifest.json de cada feature directo del master-clone (sitio-cms-mongo) — siempre refleja el estado real, no una copia desactualizada.',
+	}}
+>
+	<p>
+		Esta tabla <strong>no es contenido escrito a mano</strong> — se genera leyendo
+		<code>manifest.json</code> de cada carpeta de <code>cms/src/_library/</code> directo del
+		repo <code>sitio-cms-mongo</code> (repo hermano de este catálogo), en cada build o
+		arranque de <code>pnpm dev</code>. Si algo se ve desactualizado acá, el problema está en el
+		manifest de esa feature en el master-clone, no en este catálogo.
+	</p>
+
+	<table>
+		<thead>
+			<tr>
+				<th>Feature</th>
+				<th>Categoría</th>
+				<th>Versión</th>
+				<th>Requiere (collections/globals)</th>
+				<th>Recomienda</th>
+			</tr>
+		</thead>
+		<tbody>
+			{
+				manifests.map(({ data }) => (
+					<tr>
+						<td>
+							<a href={`/components/${data.id}/`}>{data.name}</a>
+						</td>
+						<td>{data.category ?? '—'}</td>
+						<td>{data.version}</td>
+						<td>
+							{(Array.isArray(data.requires)
+								? data.requires
+								: [...(data.requires?.collections ?? []), ...(data.requires?.globals ?? [])]
+							).join(', ') || '—'}
+						</td>
+						<td>{data.recommends?.libraryFeatures?.join(', ') || '—'}</td>
+					</tr>
+				))
+			}
+		</tbody>
+	</table>
+</StarlightPage>

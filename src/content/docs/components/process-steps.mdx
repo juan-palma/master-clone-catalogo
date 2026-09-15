@@ -1,0 +1,81 @@
+---
+title: "Process Steps / Timeline"
+description: "Serie de pasos numerados para explicar un proceso o metodología de trabajo."
+---
+
+import LivePreview from '../../../components/LivePreview.astro';
+
+:::tip[Base reutilizable, no un contrato]
+Esto es un punto de partida genérico y probado — en la práctica, la mayoría de proyectos de cliente ajustan diseño y/o campos antes de usarlo. Sirve para decidir con qué arrancar, no para asumir que se va a usar tal cual.
+:::
+
+**Última actualización:** 2026-09-14
+**Versión:** 1.0.0
+**Estado:** ⏳ Sin campo activo en el CMS de este Master Clone todavía
+
+---
+
+## ¿Qué es?
+
+Una serie de pasos numerados que explican "cómo trabajamos" o un proceso paso a paso. El número
+de cada paso lo calcula el propio componente por posición — no es un campo del CMS.
+
+---
+
+## ¿Cuándo usarlo?
+
+- ✅ Explicar un proceso de trabajo o metodología
+- ✅ Mostrar los pasos de un servicio (ej. "1. Diagnóstico, 2. Propuesta, 3. Ejecución")
+
+**No lo uses si:**
+- ❌ Los elementos no tienen un orden secuencial real (usa **Feature Grid**)
+
+---
+
+## Cómo activarlo
+
+Este feature no tiene un campo montado en ningún global de este Master Clone hoy — el componente
+en `site/src/_library/process-steps/` está listo, pero falta:
+
+1. Agregar un campo (ej. `processSteps`, con la forma de `data` que se ve abajo) al global donde
+   quieras montarlo (ej. `PageHome.ts`).
+2. `pnpm payload generate:types`.
+3. Pasar ese campo como `data` a `<ProcessSteps id="process-steps" data={data} />`.
+
+---
+
+## Parámetros (`data` que recibe `ProcessSteps.astro`)
+
+:::note[🔁 `items[]` es de varios — sin límite fijo]
+`items` es un campo `hasMany` real del CMS: se pueden agregar tantos pasos como se necesiten, quitar
+cualquiera, y reordenarlos (arrastrando en el admin de Payload) — no hay un número fijo. El
+preview de abajo lo demuestra: usá "+ Agregar paso" / "× Quitar paso" para probarlo con la
+cantidad que quieras, no solo los 5 de ejemplo.
+:::
+
+| Parámetro | Tipo | Descripción | Requerido |
+|---|---|---|---|
+| **saludo** | string | Etiqueta corta arriba del título | ❌ No |
+| **h2** | string | Título de la sección | ❌ No |
+| **items[]** 🔁 | array (`hasMany`) | Pasos — cualquier cantidad, agregable/quitable/reordenable | ❌ No |
+| **items[].h3** | string | Título del paso | ❌ No |
+| **items[].text** | richText | Descripción del paso | ❌ No |
+
+---
+
+## Preview, uso y código
+
+<LivePreview id="process-steps" height={420} />
+
+---
+
+## Notas técnicas
+
+- `site/src/_library/process-steps/` tiene `ProcessSteps.astro` (único archivo — sin JS de
+  cliente) + `ProcessSteps.css`.
+- Layout de 5 por fila en desktop, 3 en tablet y 1 en mobile (donde además cada paso pasa a
+  layout horizontal: número al lado del texto, no arriba) — usa `flex-wrap` con ancho fijo por
+  ítem, no `grid-template-columns`, para que una cantidad que no completa la fila (ej. 4, o 6 con
+  una fila de 1) quede centrada como grupo en vez de pegada a la izquierda.
+- El número de cada paso (`step-num`) es puramente visual, calculado por posición en el array —
+  reordenar `items[]` reordena los números automáticamente.

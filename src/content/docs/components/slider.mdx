@@ -1,0 +1,131 @@
+---
+title: "Slider"
+description: "El sistema base de bloques de contenido con fondo (hero, banners CTA) — imagen/video/color + texto, con carrusel automático si hay más de un slider activo en la misma zona."
+---
+
+import LivePreview from '../../../components/LivePreview.astro';
+import SliderParallaxDemo from '../../../components/SliderParallaxDemo.astro';
+
+:::tip[Base reutilizable, no un contrato]
+Esto es un punto de partida genérico y probado — en la práctica, la mayoría de proyectos de cliente ajustan diseño y/o campos antes de usarlo. Sirve para decidir con qué arrancar, no para asumir que se va a usar tal cual.
+:::
+
+**Última actualización:** 2026-09-14
+**Versión:** 1.0.0
+**Estado:** ✅ Activo por defecto (`library.config.json` → `"slider": true`)
+
+---
+
+## ¿Qué es?
+
+El Slider es el sistema base de "bloques de contenido con fondo" del sitio — una sola imagen/video/color con texto encima, o un carrusel real ([Swiper](https://swiperjs.com/)) cuando hay varios. Se usa para el hero de inicio ("Inicio"), banners intermedios (CTA), y cualquier otra área que necesite un bloque de imagen + texto + botón.
+
+**Ejemplo:** El hero de la página de inicio usa un slider con `area: "inicio"`. Si solo hay un slider activo en esa área, se muestra directo (sin cargar la librería de carrusel — cero costo de rendimiento). Si hay 2 o más, se activa el carrusel real automáticamente, sin cambiar nada de código.
+
+:::note[La animación del carrusel la controla Swiper]
+Cuando hay 2+ sliders activos, la rotación/transición/paginación/flechas las maneja
+[Swiper](https://swiperjs.com/) — y por lo tanto **hereda todas sus opciones configurables**
+(efectos de transición, autoplay, breakpoints, etc.), no solo lo que expone directamente el CMS.
+Ver la [documentación oficial de Swiper](https://swiperjs.com/swiper-api) para la lista completa
+de props que se pueden pasar vía `options.slider`.
+:::
+
+---
+
+## ¿Cuándo usarlo?
+
+- ✅ Necesitas un hero de página con imagen/video de fondo + texto + botón
+- ✅ Necesitas un banner intermedio (CTA) en medio de la página
+- ✅ El cliente quiere poder rotar entre varios mensajes/promociones en una misma zona
+
+**No lo uses si:**
+- ❌ Necesitas una galería de imágenes pura sin texto (ver **Gallery**)
+- ❌ Es contenido fijo que nunca va a rotar ni cambiar (mejor un componente estático)
+
+---
+
+## Cómo activarlo
+
+Ya viene activo por defecto en el Master Clone (`library.config.json` → `"slider": true`) — no
+requiere ningún paso adicional. Para usarlo, crea documentos en la colección **Sliders** del
+admin con el mismo `settings.areas` (ej. `inicio`) — 1 documento activo en esa zona se muestra
+directo, 2 o más activan el carrusel automáticamente.
+
+---
+
+## Parámetros (documento de la collection `sliders`)
+
+| Parámetro | Tipo | Descripción | Requerido |
+|---|---|---|---|
+| **name** | string | Nombre interno del slider (identifica el documento) | ✅ Sí |
+| **info** | richText | Texto principal — admite varios bloques (título + varios párrafos), no solo una línea | ❌ No |
+| **images.mainImage** | upload | Imagen principal | ❌ No |
+| **images.hovers[].hover.image** | upload | Imagen de hover — también es la capa que usa el efecto de paralax del hero (ver más abajo) | ❌ No |
+| **images.hovers[].hover.position** | select (`below` / `on`) | Si la imagen de hover va detrás o encima de la principal | ❌ No |
+| **images.maxWidth** | string (CSS) | Límite máximo del ancho del bloque de imagen — la imagen principal se encoge manteniendo su proporción (no se deforma) | ❌ No |
+| **styles.background_color / background_image / background_video** | string / upload | Fondo del slide | ❌ No |
+| **styles.titleColor / textColor** | string (color) | Colores de texto | ❌ No |
+| **styles.background_overlay_color / background_overlay_opacity** | string (color) / number | Overlay de color sobre el fondo | ❌ No |
+| **settings.areas** | string | Zona del sitio donde aparece (ej. `inicio`, `cta-intermedio`) — así es como el sitio sabe qué sliders agrupar | ✅ Sí |
+| **settings.callToAction / ctaLink** | string | Texto y link del botón | ❌ No |
+| **settings.active** | boolean | Si está apagado, no se muestra aunque tenga zona asignada | ❌ No (default: activo) |
+| **settings.justifyBlock** | select | Alineación del bloque completo (`center` / `flex-start` / `flex-end` / `space-between` / `space-evenly`) | ❌ No |
+| **settings.justifyContent / justifyImage** | select | Alineación del texto / de la imagen (`center` / `flex-start` / `flex-end`) | ❌ No |
+| **settings.invertOrder / equalWidth / absolutePosition / oneColumnMobile / oneColumnDesktop / limitTo50** | boolean | Ajustes de layout del slide | ❌ No |
+
+:::note[Solo afecta la imagen principal]
+`images.maxWidth` limita el ancho de la columna de imagen (`.box`) — la imagen principal
+(`images.mainImage`) se encoge dentro de ese límite manteniendo su proporción real
+(`object-fit: contain`), sin deformarse. Las capas de hover (`images.hovers[]`) no se ven
+afectadas por este campo — conservan su tamaño normal (llenan la altura del bloque), ya que
+suelen usarse como fondo/capa de paralax, no como el elemento a limitar en ancho.
+:::
+
+---
+
+## Preview, uso y código
+
+<LivePreview id="slider" height={520} />
+
+### Efecto de paralax (imagen de hover)
+
+Sube una imagen en el campo **"Imagen de hover (capa de paralax)"** del preview de arriba, y
+luego haz scroll en esta página — la imagen se anima siguiendo el scroll real, igual que en el
+hero de inicio del sitio.
+
+<SliderParallaxDemo />
+
+:::caution[Esto no lo hace Slider por sí solo]
+Slider aporta la **capa** de hover (`images.hovers[].hover.position`, renderizada como
+`.hoverBack` si es `"below"` o `.hoverFront` si es `"on"`) — pero quien anima esa capa con el
+scroll es un script GSAP ScrollTrigger que vive en `Inicio.astro` (la página que usa Slider como
+hero), no Slider mismo. El script busca cualquiera de las dos capas, así que el paralax funciona
+con cualquier valor de `position`. Si reusas Slider en otro contexto (ej. un banner CTA) sin ese
+mismo wiring, la imagen de hover se muestra pero **no se anima** — hay que agregar un script
+equivalente al de `Inicio.astro` en la página donde lo uses. El demo de arriba reproduce ese
+wiring con scroll real de esta página, apuntado a lo que subas, para que puedas ver el resultado
+completo sin escribir el script primero.
+:::
+
+:::caution[Limitación conocida: deformación de imagen sin `absolutePosition`]
+Fuera del caso de `images.maxWidth` (ya corregido arriba), el modo por defecto de la columna de
+imagen (`settings.absolutePosition` **desactivado**) estira tanto la imagen principal como la de
+hover a la altura completa del bloque sin conservar su proporción real — si la imagen es más
+ancha que alta, se ve deformada (más alta que ancha). Activar **`settings.absolutePosition`**
+evita la deformación (ahí sí se respeta la proporción real), pero hoy es todo o nada: no hay forma
+de mantener proporción **sin** también activar posición absoluta, ni de elegir explícitamente si
+una imagen debe deformarse a propósito para llenar el bloque o conservar su forma. Confirmado
+también en `sitio-cms-demo` (mismo comportamiento en el sitio real, no es un artefacto de este
+catálogo) — queda pendiente para una revisión futura de Slider: separar "conservar proporción"
+de "posición absoluta" como una opción propia.
+:::
+
+---
+
+## Notas técnicas
+
+- `site/src/_library/slider/` tiene `Slider.astro` (wrapper Swiper), `Slide.astro` (un slide individual), `SliderServer.astro` (Astro Server Island — carga Swiper diferido) y `SlideBackground.astro` (fondo compartido entre el modo carrusel y el modo "un solo slide").
+- La decisión de usar o no Swiper es por **contenido**, no por configuración: 1 slider activo en la zona = sin Swiper (cero costo); 2+ = carrusel real.
+- Depende de `Media` y `Responsive` (imágenes/video).
+- El preview de arriba usa `Slider.astro` directo (no `SliderServer.astro`) — este último envuelve el mismo componente en un Astro Server Island (`server:defer`) solo para diferir su carga en el sitio real; el catálogo no necesita esa optimización, así que renderiza el componente visual directo.
+- El preview siempre muestra **1 slide** (modo "sin carrusel") — el mecanismo de preview no puede ejecutar el `<script>` real de Swiper (ver `.knowledge/live-preview-architecture.md` en el repo de este catálogo), así que el modo carrusel con 2+ slides no se puede demostrar funcionando acá.

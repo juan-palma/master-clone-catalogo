@@ -1,0 +1,63 @@
+---
+// Announcement Banner (ElementListBanners.astro) es un componente Astro puro
+// — se renderiza bien vía Container API (ver LivePreview de arriba) — pero el
+// clic real depende de un <script> propio (querySelectorAll('.anuncio') +
+// openPopup()) que la Container API nunca ejecuta (sin <script>, ver
+// .knowledge/live-preview-architecture.md). En vez de duplicar el botón
+// visualmente (como Gallery, que sí lo necesita por su animación GSAP), acá
+// alcanza con: (a) montar el Modal real una vez en esta página, y (b)
+// re-enganchar el clic del botón que YA está visible en el canvas de arriba
+// cada vez que se re-renderiza — mismo dato (data-title/data-content/
+// data-call) que el <script> original habría leído, mismo resultado.
+import Modal from '../../../sitio-cms-mongo/site/src/_library/modal/Modal.svelte';
+---
+
+<Modal client:load />
+
+<script>
+	import { openPopup } from '../../../sitio-cms-mongo/site/src/stores/popup.js';
+
+	function wireClick(shadow: ShadowRoot) {
+		const btn = shadow.querySelector<HTMLElement>('.anuncio-btn');
+		const root = shadow.querySelector<HTMLElement>('.anuncio');
+		if (!btn || !root) return;
+		btn.onclick = () => {
+			openPopup({
+				title: root.dataset.title ?? '',
+				content: root.dataset.content ?? '',
+				call: root.dataset.call || undefined,
+			});
+		};
+	}
+
+	document.addEventListener('livepreview:update', ((e: CustomEvent) => {
+		if (e.detail?.id !== 'announcement-banner') return;
+		wireClick(e.detail.shadow);
+	}) as EventListener);
+
+	// El primer render (antes de tocar ningún control) dispara
+	// 'livepreview:update' desde el <script> de LivePreview.astro, que
+	// aparece ANTES que este en la página — los <script type="module">
+	// deferred de Astro no garantizan en la práctica que ESTE
+	// addEventListener ya esté registrado para cuando eso pasa (bug real
+	// encontrado: el botón inicial no abría el Modal hasta el primer cambio
+	// de control). En vez de pelear con el orden de carga, se busca el
+	// shadow root ya existente directo por DOM y se reintenta hasta
+	// encontrarlo — no depende de qué script cargó primero.
+	function tryWireInitial(): boolean {
+		const host = document.querySelector<HTMLElement>(
+			'.live-preview[data-preview-id="announcement-banner"] .lp-shadow-host',
+		);
+		if (host?.shadowRoot) {
+			wireClick(host.shadowRoot);
+			return true;
+		}
+		return false;
+	}
+	if (!tryWireInitial()) {
+		const interval = setInterval(() => {
+			if (tryWireInitial()) clearInterval(interval);
+		}, 50);
+		setTimeout(() => clearInterval(interval), 3000);
+	}
+</script>

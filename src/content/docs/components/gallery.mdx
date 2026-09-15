@@ -1,0 +1,96 @@
+---
+title: "Gallery"
+description: "Galería de imágenes en 3 columnas con efecto de scroll (GSAP) y lightbox real al hacer clic (Modal)."
+---
+
+import LivePreview from '../../../components/LivePreview.astro';
+import GalleryInteractiveDemo from '../../../components/GalleryInteractiveDemo.astro';
+
+:::tip[Base reutilizable, no un contrato]
+Esto es un punto de partida genérico y probado — en la práctica, la mayoría de proyectos de cliente ajustan diseño y/o campos antes de usarlo. Sirve para decidir con qué arrancar, no para asumir que se va a usar tal cual.
+:::
+
+**Última actualización:** 2026-09-14
+**Versión:** 1.0.0
+**Estado:** ⏳ Inactivo por defecto (`library.config.json` → `"gallery": false`)
+
+---
+
+## ¿Qué es?
+
+Una sección de galería de imágenes en 3 columnas — las columnas laterales rotan levemente y la
+columna central se desplaza contra el scroll de la página (GSAP ScrollTrigger), y cada imagen abre
+un lightbox real al hacer clic (mismo componente **Modal** que usa el resto del sitio, no una
+simulación).
+
+---
+
+## ¿Cuándo usarlo?
+
+- ✅ Mostrar un portafolio, catálogo visual o galería de fotos
+- ✅ Cualquier caso donde el cliente quiera subir imágenes libremente y verlas en grande
+
+**No lo uses si:**
+- ❌ Necesitas imagen + texto estructurado por ítem (usa **Image-Text Split** o **Feature Grid**)
+
+---
+
+## Cómo activarlo
+
+Este feature viene **inactivo** por defecto en el Master Clone, y su global-section tampoco está
+conectado a ningún campo del CMS hoy (verificado por triangulación contra `sitio-cms-bysantik`,
+que sí lo usa vía `data.gallery` — patrón real, no inventado). Para usarlo en un proyecto:
+
+1. En `cms/library.config.json`, cambia `"gallery": false` a `"gallery": true`.
+2. `pnpm payload generate:types`.
+3. Agregar un campo (ej. `hasMany` apuntando a la collection `gallery`) al global o página donde
+   quieras montarlo, y pasar ese arreglo como `data.galleryImage` a `<Galeria data={data} />` junto
+   con `data.h2` y `data.text` (richText).
+
+---
+
+## Parámetros (`data` que recibe `Galeria.astro`)
+
+:::note[🔁 `galleryImage` es de varias — sin límite fijo]
+Es un campo `hasMany` real: se pueden subir tantas imágenes como se necesiten y quitar cualquiera
+en cualquier momento — no hay un número fijo. El control "Imágenes de la galería" del preview de
+abajo deja elegir varios archivos a la vez y quitar cada uno individualmente.
+:::
+
+| Parámetro | Tipo | Descripción | Requerido |
+|---|---|---|---|
+| **h2** | string | Título de la sección | ❌ No |
+| **text** | richText | Texto de introducción (varios párrafos) | ❌ No |
+| **galleryImage** 🔁 | Media[] (`hasMany`) | Imágenes a mostrar — cualquier cantidad — cada una necesita `alt` (campo requerido real de la collection `gallery`) | ❌ No |
+
+---
+
+## Preview, uso y código
+
+<LivePreview id="gallery" height={420} />
+
+### Hidratación real (scroll + lightbox)
+
+<GalleryInteractiveDemo />
+
+:::note[Por qué el bloque de arriba se ve diferente al de otros componentes]
+El tab "Preview" de Gallery no muestra su propio grid — usa el mismo mecanismo que Slider/Hero
+Badge (Container API + Shadow DOM) para los controles y las pestañas Uso/HTML/CSS, pero ese
+mecanismo solo produce HTML **estático** (no ejecuta el `<script>` de Gallery.svelte, ver
+`.knowledge/live-preview-architecture.md`), así que mostrarlo ahí sería la misma grilla de abajo
+repetida sin el scroll ni el lightbox funcionando. El bloque "Hidratación real" es el que monta el
+componente Svelte de verdad — comparte las mismas imágenes que subas arriba.
+:::
+
+---
+
+## Notas técnicas
+
+- `site/src/_library/gallery/` tiene `Galeria.astro` (wrapper: h2 + texto + la grilla) y
+  `Gallery.svelte` (la grilla en sí — 3 columnas, animación GSAP ScrollTrigger, lightbox).
+- El lightbox depende del feature **Modal** — `Gallery.svelte` llama a `openPopup()` del store
+  compartido (`stores/popup.js`), igual que cualquier otro lugar del sitio que lo use.
+- La collection `gallery` (upload) genera 9 tamaños (webp/avif) por imagen — ver
+  `cms/src/_library/gallery/collection.ts`.
+- Diseño triangulado contra `sitio-cms-bysantik` (patrón real confirmado: `Galeria` con
+  `data.gallery`) — no está montado en ningún global de este Master Clone hoy.

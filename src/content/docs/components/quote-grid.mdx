@@ -1,0 +1,78 @@
+---
+title: "Quote Grid"
+description: "Grilla de frases/statements cortas de marca, no testimoniales de clientes."
+---
+
+import LivePreview from '../../../components/LivePreview.astro';
+
+:::tip[Base reutilizable, no un contrato]
+Esto es un punto de partida genérico y probado — en la práctica, la mayoría de proyectos de cliente ajustan diseño y/o campos antes de usarlo. Sirve para decidir con qué arrancar, no para asumir que se va a usar tal cual.
+:::
+
+**Última actualización:** 2026-09-14
+**Versión:** 1.0.0
+**Estado:** ⏳ Sin campo activo en el CMS de este Master Clone todavía
+
+---
+
+## ¿Qué es?
+
+Una grilla de frases/statements de marca cortas — pensada para reforzar mensajes clave de forma
+visual, no testimoniales de clientes.
+
+---
+
+## ¿Cuándo usarlo?
+
+- ✅ Reforzar la identidad/valores de marca con frases cortas
+- ✅ Sección de transición entre otras secciones más densas
+
+**No lo uses si:**
+- ❌ Necesitas testimoniales reales de clientes con nombre/foto (este componente es para frases
+  de marca, no reseñas)
+
+---
+
+## Cómo activarlo
+
+Este feature no tiene un campo montado en ningún global de este Master Clone hoy — el componente
+en `site/src/_library/quote-grid/` está listo, pero falta:
+
+1. Agregar un campo (ej. `quoteGrid`, con la forma de `data` que se ve abajo) al global donde
+   quieras montarlo (ej. `PageHome.ts`).
+2. `pnpm payload generate:types`.
+3. Pasar ese campo como `data` a `<QuoteGrid id="quote-grid" data={data} />`.
+
+---
+
+## Parámetros (`data` que recibe `QuoteGrid.astro`)
+
+:::note[🔁 `items[]` es de varias — sin límite fijo]
+`items` es un campo `hasMany` real del CMS: se pueden agregar tantas frases como se necesiten,
+quitar cualquiera, y reordenarlas (arrastrando en el admin de Payload) — no hay un número fijo. El
+preview de abajo lo demuestra: usá "+ Agregar frase" / "× Quitar frase" para probarlo con la
+cantidad que quieras, no solo las 5 de ejemplo.
+:::
+
+| Parámetro | Tipo | Descripción | Requerido |
+|---|---|---|---|
+| **saludo** | string | Etiqueta corta arriba del grid | ❌ No |
+| **items[]** 🔁 | array (`hasMany`) | Frases — cualquier cantidad, agregable/quitable/reordenable | ❌ No |
+| **items[].text** | richText | Texto de la frase | ❌ No |
+
+---
+
+## Preview, uso y código
+
+<LivePreview id="quote-grid" height={320} />
+
+---
+
+## Notas técnicas
+
+- `site/src/_library/quote-grid/` tiene `QuoteGrid.astro` (único archivo — sin JS de cliente) +
+  `QuoteGrid.css`.
+- Layout de 5 por fila en desktop, 3 en tablet y 2 en mobile — usa `flex-wrap` con ancho fijo por
+  ítem (no `grid-template-columns`), así una cantidad que no completa la fila queda centrada como
+  grupo en vez de pegada a la izquierda (mismo patrón que Process Steps — `items[]` es `hasMany`
+  real, así que pasa seguido, no es un caso raro).

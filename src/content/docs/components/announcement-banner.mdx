@@ -1,0 +1,93 @@
+---
+title: "Announcement Banner"
+description: "Lista de avisos (legal, noticia, oferta) como botones en el footer que abren un Modal con el contenido completo."
+---
+
+import LivePreview from '../../../components/LivePreview.astro';
+import AnnouncementBannerModalMount from '../../../components/AnnouncementBannerModalMount.astro';
+
+:::tip[Base reutilizable, no un contrato]
+Esto es un punto de partida genérico y probado — en la práctica, la mayoría de proyectos de cliente ajustan diseño y/o campos antes de usarlo. Sirve para decidir con qué arrancar, no para asumir que se va a usar tal cual.
+:::
+
+**Última actualización:** 2026-09-14
+**Versión:** 1.0.0
+**Estado:** ✅ Activo por defecto (`library.config.json` → `"announcement-banner": true`) — a
+diferencia de la mayoría de los componentes recientes de este catálogo, este SÍ está activo y
+montado hoy en `MainFooter.astro`.
+
+---
+
+## ¿Qué es?
+
+Una lista de avisos/anuncios (legal, noticia, oferta) que aparecen como botones en el footer. Al
+hacer clic en uno, se abre un **Modal** con el título, contenido completo y un botón de acción
+opcional.
+
+**Ejemplo:** Un aviso de "Política de Cookies" o "Aviso de Privacidad" — el visitante ve un botón
+corto en el footer, y al hacer clic se despliega el texto completo sin salir de la página.
+
+---
+
+## ¿Cuándo usarlo?
+
+- ✅ Avisos legales (privacidad, cookies, términos)
+- ✅ Anuncios cortos de noticias u ofertas que no ameritan su propia sección
+- ✅ Contenido que el cliente quiere poder agregar/quitar sin tocar código
+
+**No lo uses si:**
+- ❌ Es contenido principal de la página — mejor una sección dedicada
+- ❌ Necesitas capturar datos del usuario (usa **Contact Section**)
+
+---
+
+## Cómo activarlo
+
+Ya viene activo por defecto en el Master Clone. Para agregar un aviso, creá un documento en la
+collection **Banners** del admin — se muestra automáticamente en el footer si `active` está en
+`true` (default).
+
+---
+
+## Parámetros (documento de la collection `banners`)
+
+| Parámetro | Tipo | Descripción | Requerido |
+|---|---|---|---|
+| **title** | string | Título del aviso (título del Modal) | ❌ No |
+| **info** | richText | Contenido completo (cuerpo del Modal) | ❌ No |
+| **textButton** | richText | Texto visible del botón/link en el footer | ❌ No — si queda vacío, el botón se renderiza sin texto visible pero sigue siendo clickeable |
+| **callToAction** | string (URL) | Si se define, agrega un botón de acción con este link dentro del Modal | ❌ No |
+| **slug** | string | Identificador único | ✅ Sí |
+| **type** | select (`legal` / `news` / `offer`) | Categoría del aviso | ❌ No (default: `legal`) |
+| **active** | boolean | Si está apagado, no aparece en el footer | ❌ No (default: activo) |
+
+---
+
+## Preview, uso y código
+
+<LivePreview id="announcement-banner" height={120} />
+
+<AnnouncementBannerModalMount />
+
+:::note[El botón de arriba es real, no una simulación]
+El componente en sí (`ElementListBanners.astro`) es puro Astro — se renderiza igual que
+Slider/Feature Grid vía Container API. Lo único que esa Container API no ejecuta es el
+`<script>` propio del componente (el que engancha el clic), así que este catálogo lo reconecta a
+mano cada vez que cambiás los controles — mismo dato (`data-title`/`data-content`/`data-call`)
+que leería el script original, mismo resultado: hacé clic en el botón de arriba y se abre el
+Modal real.
+:::
+
+---
+
+## Notas técnicas
+
+- `site/src/_library/announcement-banner/` tiene `ElementListBanners.astro` (con su propio
+  `<script>` para el clic) + `ElementListBanners.css` (scopeado a `footer .anuncio` — pensado
+  para vivir dentro de un `<footer>` real).
+- Depende de **Modal** — sin él montado en la misma página, el clic no tiene efecto visual.
+- `MainFooter.astro` filtra automáticamente los banners con `active: false` — no hace falta
+  borrarlos, solo desactivarlos.
+- Si `textButton` queda vacío, el botón se renderiza sin texto visible pero sigue siendo
+  clickeable — un descuido real de contenido lo dejaría invisible en la práctica, aunque siga
+  funcionando.

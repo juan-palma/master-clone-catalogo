@@ -1,0 +1,48 @@
+---
+// Demo del efecto de paralax que Slider hace posible — pero que NO ejecuta
+// Slider mismo. En el sitio real, `Inicio.astro` es quien anima la capa de
+// hover (`.hoverBack` si `position: 'below'`, `.hoverFront` si `position:
+// 'on'`) vía GSAP ScrollTrigger, ligado al scroll real de la página — Slider
+// solo aporta esa capa en su markup/CSS. Este componente reproduce ESE wiring
+// con scroll real del catálogo (no una simulación falsa) contra la imagen de
+// hover que subas en el tab Preview de Slider, para que se pueda apreciar el
+// efecto completo sin tener que copiar código de Inicio.astro a mano.
+//
+// ScrollTrigger y ScrollSmoother vienen incluidos gratis en el paquete `gsap`
+// normal desde hace tiempo — no son un plugin de pago, se confirmó viendo el
+// contenido real de node_modules/gsap antes de usarlos acá.
+---
+
+<script>
+	import gsap from 'gsap';
+	import ScrollTrigger from 'gsap/ScrollTrigger';
+
+	gsap.registerPlugin(ScrollTrigger);
+
+	function wireParallax(shadow: ShadowRoot) {
+		ScrollTrigger.getById('slider-parallax-demo')?.kill();
+		const img = shadow.querySelector<HTMLElement>(
+			'.hoverBack picture img, .hoverBack img, .hoverFront picture img, .hoverFront img',
+		);
+		if (!img) return;
+
+		gsap.to(img, {
+			yPercent: 100,
+			ease: 'none',
+			scrollTrigger: {
+				id: 'slider-parallax-demo',
+				trigger: img,
+				start: 'top bottom',
+				end: 'bottom top',
+				scrub: true,
+			},
+		});
+	}
+
+	document.addEventListener('livepreview:update', ((e: CustomEvent) => {
+		if (e.detail?.id !== 'slider') return;
+		// Esperar un frame — el innerHTML recién asignado necesita pintarse antes
+		// de que ScrollTrigger pueda medir correctamente la posición del elemento.
+		requestAnimationFrame(() => wireParallax(e.detail.shadow));
+	}) as EventListener);
+</script>

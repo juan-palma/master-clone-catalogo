@@ -1,0 +1,129 @@
+---
+// Preview de Modal — a diferencia de LivePreview.astro (Astro puro, sin JS de
+// cliente, Container API para re-render), Modal.svelte es un componente de
+// FRAMEWORK real: necesita hidratación de cliente de verdad (Astro Island,
+// client:load) y no toma props — se controla llamando openPopup()/closePopup()
+// del store compartido. Por eso no encaja en el registro/mecanismo genérico de
+// LivePreview.astro; es un caso bespoke, el único de este tipo hasta ahora
+// (Gallery.svelte será el segundo cuando se construya).
+import { Tabs, TabItem, Code } from '@astrojs/starlight/components';
+import Modal from '../../../sitio-cms-mongo/site/src/_library/modal/Modal.svelte';
+
+const usageExample = `import { openPopup } from '../../stores/popup.js';
+
+openPopup({
+	title: 'Aviso de privacidad',
+	content: '<p>Usamos cookies para mejorar tu experiencia...</p>',
+	// call: 'https://example.com', // opcional — agrega un botón de acción
+});`;
+---
+
+<Tabs>
+	<TabItem label="Preview">
+		<div class="modal-preview not-content">
+			<div class="mp-fields">
+				<label>
+					Título
+					<input type="text" id="mp-title" placeholder="Aviso de privacidad" />
+				</label>
+				<label>
+					Contenido
+					<textarea id="mp-content" rows="3" placeholder="Usamos cookies para mejorar tu experiencia..."></textarea>
+				</label>
+			</div>
+			<div class="mp-buttons">
+				<button type="button" data-action="fixed">Abrir con texto fijo</button>
+				<button type="button" data-action="dynamic">Abrir con texto de arriba</button>
+			</div>
+			<Modal client:load />
+		</div>
+		<p class="lp-caption">
+			Preview en vivo — el componente real, controlado igual que en el sitio (vía el store
+			compartido <code>openPopup()</code>), no una simulación. "Texto fijo" abre siempre con el
+			mismo ejemplo; "Texto de arriba" usa lo que escribas en los campos.
+		</p>
+	</TabItem>
+	<TabItem label="Uso">
+		<Code code={usageExample} lang="js" />
+		<p class="lp-caption">
+			Así se ve una llamada real en cualquier parte del sitio — el botón "Abrir con texto fijo"
+			de la pestaña Preview ejecuta exactamente esto.
+		</p>
+	</TabItem>
+</Tabs>
+
+<style>
+	.modal-preview {
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.5rem;
+		padding: 1rem;
+		/*
+		 * El botón de cerrar usa esta variable para su fondo SOLO en hover (ver
+		 * fix 2026-09-14 en Modal.svelte — antes también controlaba el color
+		 * default y anulaba el contraste de la X contra su propio fondo). Mismo
+		 * valor de ejemplo que usa LivePreview.astro (data/_seed genérico, no de
+		 * ningún cliente real).
+		 */
+		--ida-color-main-first: #e27722;
+	}
+	.mp-fields {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin-bottom: 1rem;
+	}
+	.mp-fields label {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		font-size: 0.8rem;
+	}
+	.mp-fields input,
+	.mp-fields textarea {
+		padding: 0.4rem 0.6rem;
+		font: inherit;
+		resize: vertical;
+	}
+	.mp-buttons {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+	}
+	.mp-buttons button {
+		padding: 0.5rem 1rem;
+		border-radius: 0.375rem;
+		border: 1px solid var(--sl-color-gray-4);
+		background: var(--sl-color-gray-6);
+		color: var(--sl-color-white);
+		cursor: pointer;
+	}
+	.lp-caption {
+		font-size: 0.8rem;
+		opacity: 0.7;
+		margin-top: 0.25rem;
+	}
+</style>
+
+<script>
+	import { openPopup } from '../../../sitio-cms-mongo/site/src/stores/popup.js';
+
+	const titleInput = document.getElementById('mp-title') as HTMLInputElement;
+	const contentInput = document.getElementById('mp-content') as HTMLTextAreaElement;
+
+	document.querySelectorAll<HTMLButtonElement>('.mp-buttons button').forEach((btn) => {
+		btn.addEventListener('click', () => {
+			if (btn.dataset.action === 'fixed') {
+				openPopup({
+					title: 'Aviso de privacidad',
+					content:
+						'<p>Este es un texto de ejemplo fijo — el mismo tipo de contenido que muestra un Announcement Banner o un link de política en el footer al hacer clic.</p>',
+				});
+			} else {
+				openPopup({
+					title: titleInput.value.trim() || titleInput.placeholder,
+					content: `<p>${(contentInput.value.trim() || contentInput.placeholder)}</p>`,
+				});
+			}
+		});
+	});
+</script>

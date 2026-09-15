@@ -1,0 +1,83 @@
+---
+title: "WhatsApp Floating Action Button"
+description: "Botón flotante persistente (sitio completo) que enlaza a wa.me/{número}. Ícono configurable, con fallback SVG genérico. Inactivo por defecto."
+---
+
+import LivePreview from '../../../components/LivePreview.astro';
+
+:::tip[Base reutilizable, no un contrato]
+Esto es un punto de partida genérico y probado — en la práctica, la mayoría de proyectos de cliente ajustan diseño y/o campos antes de usarlo. Sirve para decidir con qué arrancar, no para asumir que se va a usar tal cual.
+:::
+
+**Última actualización:** 2026-09-15
+**Versión:** 1.0.0
+**Estado:** ❌ Inactivo por defecto (`UIElements.whatsappFab.enabled`)
+
+---
+
+## ¿Qué es?
+
+Un botón flotante persistente (`position: fixed`, esquina inferior derecha) que enlaza directo a
+un chat de WhatsApp (`wa.me/{número}`) — visible en **todo el sitio**, no solo la home, con una
+animación sutil de flotado. Ícono configurable desde el admin; si no se sube ninguno, usa un SVG
+genérico de WhatsApp incluido.
+
+---
+
+## ¿Cuándo usarlo?
+
+- ✅ El cliente quiere un canal de contacto directo y siempre visible, sin depender de que el
+  visitante llegue hasta Contact Section
+
+**No lo uses si:**
+- ❌ Ya existe otro botón flotante en el sitio (evitar dos FABs compitiendo por la misma esquina)
+- ❌ El cliente prefiere que el contacto solo viva dentro de una sección (usa **Contact Section**)
+
+---
+
+## Cómo activarlo
+
+1. Panel admin → **UI Elements** → **WhatsApp Fab**
+2. Activar el checkbox y cargar el número (con código de país, solo dígitos)
+3. Ícono opcional — sin uno, se usa el SVG genérico incluido
+
+Si no está activo, o no hay ningún número cargado, el botón **no se renderiza** — no hay fallback
+visible sin número real.
+
+---
+
+## Parámetros (`UIElements.whatsappFab`)
+
+| Parámetro | Tipo | Descripción | Requerido |
+|---|---|---|---|
+| **enabled** | checkbox | Muestra/oculta el botón en todo el sitio | ❌ No |
+| **phone** | string | Número con código de país, solo dígitos (arma el link a `wa.me/{phone}`) | ✅ Sí (si `enabled`) |
+| **icon** | Media | Ícono personalizado — sin este, usa el SVG genérico de WhatsApp | ❌ No |
+
+---
+
+## Preview, uso y código
+
+<LivePreview id="whatsapp-fab" height={220} />
+
+:::note[El botón se ve "contenido" acá, no flotando de verdad]
+El CSS real usa `position: fixed` a propósito — en producción flota sobre toda la página sin
+importar el scroll. Este preview lo fuerza a `position: absolute` dentro de su caja (ver Notas
+técnicas) porque mostrar un elemento `fixed` de verdad dentro de una caja de preview chica no
+tendría sentido — se saldría de la caja y taparía el resto de esta página. El HTML/CSS reales
+(pestañas de abajo) sí muestran `position: fixed` tal cual es.
+:::
+
+---
+
+## Notas técnicas
+
+- `site/src/_library/whatsapp-fab/` tiene `WhatsAppFab.astro` (sin `<script>` propio) +
+  `WhatsAppFab.css`.
+- Montado en `site/src/_core/layouts/Layout.astro` (sitio completo, condicional a
+  `dataUiElements.whatsappFab.enabled && dataUiElements.whatsappFab.phone`).
+- A diferencia de Branches/Announcement Banner, los campos viven directo en `UIElements.ts` (no
+  vía `globalSection.ts` del feature) — el propio `manifest.json` lo anota como pendiente de
+  migrar al patrón modular estándar.
+- `z-index: 300` — revisar que no compita con Modal (que suele necesitar un z-index más alto para
+  el overlay) si se activan varios FABs/overlays a la vez.

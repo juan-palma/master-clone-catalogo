@@ -1,0 +1,98 @@
+---
+title: "Contact Section"
+description: "Sección de contacto: métodos de contacto + formulario configurable desde el CMS + aviso de privacidad. Activa por defecto en casi todo proyecto de cliente."
+---
+
+import LivePreview from '../../../components/LivePreview.astro';
+
+:::tip[Base reutilizable, no un contrato]
+Esto es un punto de partida genérico y probado — en la práctica, la mayoría de proyectos de cliente ajustan diseño y/o campos antes de usarlo. Sirve para decidir con qué arrancar, no para asumir que se va a usar tal cual.
+:::
+
+**Última actualización:** 2026-09-15
+**Versión:** 1.0.0
+**Estado:** ✅ Activo por defecto (toggle en el admin, no en `library.config.json`)
+
+---
+
+## ¿Qué es?
+
+La sección de contacto del sitio: métodos de contacto (email/teléfono/WhatsApp) + un formulario
+configurable desde el CMS (usando el plugin de formularios de Payload) + aviso de privacidad
+enlazado al Modal.
+
+**A diferencia de las demás secciones de este catálogo, esta se deja siempre montada por
+defecto** — casi todo proyecto de cliente necesita una sección de contacto.
+
+---
+
+## ¿Cuándo usarlo?
+
+- ✅ Es prácticamente obligatorio en cualquier sitio de cliente
+- ✅ Cuando necesitas capturar leads con un formulario
+
+**No lo uses si:**
+- ❌ El proyecto realmente no necesita contacto por sitio (landing de un solo producto, por
+  ejemplo) — en ese caso, apágalo (ver abajo).
+
+---
+
+## Cómo activarlo/desactivarlo
+
+1. Panel admin → **UI Elements**
+2. **"Activar sección de contacto"** (activo por defecto)
+
+Si se desactiva, o si no hay ningún dato cargado (título, descripción, contactos o formulario),
+la sección **no renderiza nada** — no deja cajas vacías.
+
+---
+
+## Parámetros (global `footer` → `body.footer`)
+
+:::note[🔁 `contacts[]` es de varios — sin límite fijo]
+Es un campo `hasMany` real del CMS (relación a la collection `Contacts`): se pueden agregar
+tantos métodos de contacto como se necesiten, quitar cualquiera, y reordenarlos — no hay un
+número fijo. El preview de abajo lo demuestra con "+ Agregar método de contacto" / "× Quitar".
+:::
+
+| Parámetro | Tipo | Descripción | Requerido |
+|---|---|---|---|
+| **section_label** | string | Etiqueta corta sobre el título | ❌ No |
+| **h2** | string | Título de la sección | ❌ No |
+| **text** | richText | Texto introductorio | ❌ No |
+| **images.logo_footer** | Media | Logo opcional en la columna izquierda | ❌ No |
+| **contacts[]** 🔁 | array (`hasMany`) | Métodos de contacto — cualquier cantidad (relación a `Contacts`) | ❌ No |
+| **contacts[].type** | select (`email` / `phone` / `whatsapp`) | Determina el ícono y cómo se arma el link (`mailto:`/`tel:`/`wa.me`) | ❌ No |
+| **contacts[].text** | string | Etiqueta visible (ej. "Escríbenos") | ❌ No |
+| **contacts[].value** | string | El correo/teléfono en sí | ❌ No |
+| **form** | relación | Formulario a mostrar (plugin `@payloadcms/plugin-form-builder`) — si no hay ninguno asignado, el `<form>` no se renderiza | ❌ No |
+| **privacyNote / privacyNotice** | richText / relación | Aviso de privacidad enlazado al Modal | ❌ No |
+
+---
+
+## Preview, uso y código
+
+<LivePreview id="contact-section" height={480} />
+
+:::caution[El formulario del preview es fijo, y el envío no funciona acá]
+`form` es una relación real al plugin `@payloadcms/plugin-form-builder` — sus campos no se editan
+uno por uno desde este componente, así que el preview usa un formulario de ejemplo fijo (Nombre,
+Correo, Mensaje) solo para mostrar el layout real. El envío (`<script>` propio del componente)
+hace un `POST` real a `/api/submit-form/`, que no existe en este catálogo (sin backend) — al
+enviar vas a ver el mensaje de error, es el comportamiento esperado acá, no un bug.
+:::
+
+---
+
+## Notas técnicas
+
+- `site/src/_library/contact-section/` tiene `Contacto.astro` (con su propio `<script>` para
+  validación y envío del formulario) + `Contacto.css`.
+- Depende del plugin `@payloadcms/plugin-form-builder` para el formulario y de **Modal** para el
+  aviso de privacidad.
+- Layout de dos columnas (info+contactos / formulario) que colapsa a una sola a partir de 900px.
+- El `<form>` se auto-oculta si no hay `form` asignado, y toda la sección se auto-oculta si no
+  hay NINGÚN dato real que mostrar (título, texto, contactos o formulario) — sin lógica adicional
+  en el front, evita cajas vacías.
+- Footer como layout completo (nav, logo, crédito) queda fuera de este feature — es un componente
+  aparte, ver también el toggle `UIElements.footer.enabled` para apagar el footer entero.

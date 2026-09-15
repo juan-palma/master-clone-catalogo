@@ -1,0 +1,94 @@
+---
+title: "Feature Grid"
+description: "Grilla de 3-4 columnas (ícono + título + texto) para servicios, características o diferenciadores, en variante cards o list."
+---
+
+import LivePreview from '../../../components/LivePreview.astro';
+
+:::tip[Base reutilizable, no un contrato]
+Esto es un punto de partida genérico y probado — en la práctica, la mayoría de proyectos de cliente ajustan diseño y/o campos antes de usarlo. Sirve para decidir con qué arrancar, no para asumir que se va a usar tal cual.
+:::
+
+**Última actualización:** 2026-09-14
+**Versión:** 1.0.0
+**Estado:** ⏳ Sin campo activo en el CMS de este Master Clone todavía
+
+---
+
+## ¿Qué es?
+
+Una grilla de 3-4 columnas con ícono + título + texto, para mostrar servicios, características o
+diferenciadores. Fusiona lo que originalmente eran dos secciones separadas y estructuralmente
+idénticas (Servicios + Diferentes) — mismo componente, controlado por `variant`. Soporta dos
+variantes visuales: **cards** (tarjetas con borde) o **list** (compacto, sin borde).
+
+---
+
+## ¿Cuándo usarlo?
+
+- ✅ Mostrar servicios de una empresa
+- ✅ Listar características/beneficios de un producto
+- ✅ Comparar "qué nos hace diferentes"
+
+**No lo uses si:**
+- ❌ Solo tienes 1-2 elementos — mejor un layout más simple
+- ❌ Necesitas pasos numerados en orden (usa **Process Steps**)
+
+---
+
+## Cómo activarlo
+
+Este feature no tiene un campo montado en ningún global de este Master Clone hoy — el componente
+en `site/src/_library/feature-grid/` está listo, pero falta:
+
+1. Agregar un campo (ej. `featureGrid`, con la forma de `data` que se ve abajo) al global donde
+   quieras montarlo (ej. `PageHome.ts`).
+2. `pnpm payload generate:types`.
+3. Pasar ese campo como `data` a `<FeatureGrid id="feature-grid" data={data} />`.
+
+---
+
+## Parámetros (`data` que recibe `FeatureGrid.astro`)
+
+:::note[🔁 `items[]` es de varios — sin límite fijo]
+`items` es un campo `hasMany` real del CMS: se pueden agregar tantos ítems como se necesiten,
+quitar cualquiera, y reordenarlos (arrastrando en el admin de Payload) — no hay un número fijo
+("3-4 columnas" en la descripción es solo el diseño visual típico, no un tope real). El preview de
+abajo lo demuestra: usá "+ Agregar ítem" / "× Quitar ítem" para probarlo con la cantidad que
+quieras, no solo los 3 de ejemplo.
+:::
+
+| Parámetro | Tipo | Descripción | Requerido |
+|---|---|---|---|
+| **variant** | select (`cards` / `list`) | Estilo de presentación — configurable desde el CMS, no en código | ❌ No (default: `cards`) |
+| **saludo** | string | Etiqueta corta arriba del título | ❌ No |
+| **h2** | string | Título de la sección | ❌ No |
+| **text** | richText | Texto de introducción (varios párrafos) | ❌ No |
+| **frase** | string | Frase de cierre, debajo del grid (estilo `list`) | ❌ No |
+| **items[]** 🔁 | array (`hasMany`) | Ítems — cualquier cantidad, agregable/quitable/reordenable | ❌ No |
+| **items[].icono** | Media | Ícono del elemento (SVG o imagen) | ❌ No |
+| **items[].h3** | string | Título del elemento | ❌ No |
+| **items[].text** | richText | Descripción del elemento | ❌ No |
+| **items[].subtitle** | string | Subtítulo (opcional, estilo `cards`) — no expuesto en el preview de abajo | ❌ No |
+| **items[].tagline** | string | Frase destacada (opcional) — no expuesto en el preview de abajo | ❌ No |
+| **items[].cta_text / cta_link** | string | Botón opcional del elemento — no expuesto en el preview de abajo | ❌ No |
+
+---
+
+## Preview, uso y código
+
+<LivePreview id="feature-grid" height={480} />
+
+---
+
+## Notas técnicas
+
+- `site/src/_library/feature-grid/` tiene `FeatureGrid.astro` (único archivo — sin JS de cliente)
+  + `FeatureGrid.css`.
+- Si el ícono subido es un SVG (`mimeType: 'image/svg+xml'`), `FeatureGrid.astro` lo trae con
+  `fetch()` y lo inyecta inline (`set:html`) para poder colorearlo con CSS (`color`) — cualquier
+  otro tipo de imagen se muestra como `<img>` normal. El preview de arriba siempre usa el camino
+  `<img>` (el control de ícono no distingue tipo de archivo).
+- **Limitación conocida:** hoy solo soporta una instancia por página — si un proyecto necesita
+  dos grids distintos simultáneos, hace falta rediseñar como bloques repetibles, no resuelto
+  todavía.

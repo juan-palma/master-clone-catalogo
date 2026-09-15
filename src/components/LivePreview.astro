@@ -1,0 +1,834 @@
+---
+// Preview en vivo del componente REAL (cross-repo, nunca copiado), aislado con
+// Shadow DOM — no <iframe>. El Shadow Root le da al CSS no-scopeado del
+// componente (main.css + su propio .css, ninguno pensado para convivir con el
+// tema de Starlight) un límite de encapsulamiento real en ambas direcciones,
+// sin pagar el costo de un documento/contexto de navegación aparte.
+import { Tabs, TabItem, Code } from '@astrojs/starlight/components';
+import prettier from 'prettier';
+import type { Control } from '../lib/component-registry';
+import { registry, renderEntry, readEntryCss, readOwnCss } from '../lib/component-registry';
+
+interface Props {
+	id: string;
+	height?: number;
+}
+const { id, height = 320 } = Astro.props;
+
+const entry = registry[id];
+if (!entry) {
+	throw new Error(`LivePreview: "${id}" no está registrado en component-registry.ts`);
+}
+
+const initialHtml = await renderEntry(entry, entry.buildProps(entry.initialControlValues));
+const css = readEntryCss(entry);
+// Algunos componentes (ej. Slider) no traen un .css propio — su estilo vive
+// completo en main.css. <Code> no acepta un string vacío.
+const ownCss = readOwnCss(entry).trim();
+// El HTML que devuelve la Container API viene en una sola línea, sin indentar
+// (pensado para inyectarse, no para leerse) — se formatea SOLO para mostrarlo
+// en la pestaña "HTML" de la doc. `initialHtml` (sin formatear) sigue siendo
+// el que se manda al Shadow Root vía el payload — formatear/no formatear no
+// cambia cómo se ve renderizado, solo cómo se lee como código. El parser HTML
+// de prettier puede rechazar markup válido pero inusual (ej. un custom
+// element que interpreta como implícitamente auto-cerrado) — si eso pasa,
+// mejor mostrar el HTML sin formatear que romper la página entera.
+let formattedHtml = initialHtml;
+try {
+	formattedHtml = await prettier.format(initialHtml, { parser: 'html' });
+} catch {
+	// silencioso — fallback ya asignado arriba.
+}
+---
+
+{
+	/*
+	 * El payload (HTML+CSS inicial) va en un <script type="application/json">
+	 * FUERA de <Tabs>, no en un <template> adentro de un TabItem — Starlight
+	 * renderiza los hijos de <Tabs> pasándolos por su propio parser/serializador
+	 * de HTML (processPanels, vía Astro.slots.render) para armar los paneles, y
+	 * ese proceso NO preserva el contenido de <template> (queda vacío — bug real
+	 * encontrado 2026-09-14, <Code> sí sobrevive porque ya es HTML normal, no
+	 * contenido "inerte"). El texto de un <script> sí sobrevive cualquier
+	 * reprocesamiento de HTML sin importar el parser usado.
+	 */
+}
+<script type="application/json" class="lp-payload" data-preview-id={id} set:html={
+	JSON.stringify({ html: initialHtml, css }).replace(/</g, '\\u003c')
+} />
+
+<Tabs>
+	<TabItem label="Preview">
+		<div
+			class={`live-preview not-content${entry.hideCanvasPreview ? ' live-preview--hide-canvas' : ''}`}
+			data-preview-id={id}
+			data-fixed-height={entry.needsFixedCanvasHeight ? 'true' : undefined}
+			style={`--lp-height:${height}px`}
+		>
+			{
+				entry.controls.length > 0 && (
+					<form class="lp-controls">
+						{entry.controls.filter((c) => c.type !== 'repeater').map((control) => (
+							<label>
+								{control.label}
+								{control.type === 'text' && (
+									<input
+										type="text"
+										name={control.name}
+										value={String(entry.initialControlValues[control.name] ?? '')}
+									/>
+								)}
+								{control.type === 'textarea' && (
+									<textarea name={control.name} rows="4">{String(entry.initialControlValues[control.name] ?? '')}</textarea>
+								)}
+								{control.type === 'checkbox' && (
+									<input
+										type="checkbox"
+										name={control.name}
+										checked={Boolean(entry.initialControlValues[control.name])}
+									/>
+								)}
+								{control.type === 'select' && (
+									<select name={control.name}>
+										{control.options.map((opt) => (
+											<option value={opt} selected={entry.initialControlValues[control.name] === opt}>
+												{opt}
+											</option>
+										))}
+									</select>
+								)}
+								{control.type === 'image' && (
+									<span class="lp-image-control">
+										<input type="file" accept="image/*" name={control.name} />
+										<button type="button" class="lp-clear-image" data-clears={control.name}>
+											Quitar imagen
+										</button>
+									</span>
+								)}
+								{control.type === 'images' && (
+									<span class="lp-images-control" data-images-name={control.name}>
+										<input type="file" accept="image/*" multiple class="lp-images-add-input" />
+										<div class="lp-images-list"></div>
+									</span>
+								)}
+							</label>
+						))}
+						{
+							/*
+							 * Los 'repeater' viven FUERA del <label> por control — son un
+							 * bloque compuesto (varios ítems, cada uno con sus propios
+							 * campos), no un único input etiquetado. El badge "🔁
+							 * múltiples" es a propósito muy visible — el usuario pidió
+							 * explícitamente que quedara claro que estos campos aceptan
+							 * cualquier cantidad de ítems (agregar/quitar), no un número
+							 * fijo — antes de esto Feature Grid/Process Steps mostraban
+							 * un número fijo de slots sin dejar ver que el campo real es
+							 * `hasMany`.
+							 */
+						}
+						{entry.controls.filter((c): c is Extract<Control, { type: 'repeater' }> => c.type === 'repeater').map((control) => (
+							<div
+								class="lp-repeater-control"
+								data-repeater-name={control.name}
+								data-item-label={control.itemLabel}
+								data-fields={JSON.stringify(control.fields)}
+								data-initial={JSON.stringify(entry.initialControlValues[control.name] ?? [])}
+							>
+								<div class="lp-repeater-heading">
+									<span class="lp-repeater-title">{control.label}</span>
+									<span class="lp-repeater-badge" title="Este campo es `hasMany` en el CMS real — se pueden agregar y quitar los que hagan falta, no hay un número fijo.">
+										🔁 múltiples — agregá o quitá los que quieras
+									</span>
+								</div>
+								<div class="lp-repeater-items"></div>
+								<button type="button" class="lp-repeater-add">+ Agregar {control.itemLabel}</button>
+							</div>
+						))}
+					</form>
+				)
+			}
+
+			<div class="lp-shadow-host"></div>
+		</div>
+		{
+			entry.hideCanvasPreview ? (
+				<p class="lp-caption">
+					Este preview estático no se muestra acá para no repetir la misma grilla dos veces — el
+					componente real (hidratado, con scroll y lightbox funcionando) está más abajo. Los
+					controles de arriba alimentan a ambos.
+				</p>
+			) : (
+				<p class="lp-caption">Preview en vivo con datos de ejemplo — el componente real, no una captura.</p>
+			)
+		}
+	</TabItem>
+	<TabItem label="Uso">
+		<Code code={entry.usageExample} lang="astro" />
+	</TabItem>
+	<TabItem label="HTML">
+		<Code code={formattedHtml} lang="html" />
+		<p class="lp-caption">HTML real que produce el ejemplo de arriba — no cambia si mueves los controles del tab Preview (es el del render inicial).</p>
+	</TabItem>
+	<TabItem label="CSS">
+		{
+			ownCss ? (
+				<Code code={ownCss} lang="css" />
+			) : (
+				<p class="lp-caption">
+					Este componente no tiene un .css propio — su estilo vive en <code>main.css</code> (reglas
+					compartidas del sitio, no específicas de este componente).
+				</p>
+			)
+		}
+	</TabItem>
+</Tabs>
+
+<style>
+	.live-preview {
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.5rem;
+		overflow: hidden;
+	}
+	.lp-controls {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1rem;
+		padding: 0.75rem 1rem;
+		background: var(--sl-color-gray-6);
+		border-bottom: 1px solid var(--sl-color-gray-5);
+	}
+	.lp-controls label {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		font-size: 0.8rem;
+	}
+	.lp-controls input[type='text'] {
+		min-width: 220px;
+		padding: 0.35rem 0.5rem;
+	}
+	.lp-controls textarea {
+		min-width: 260px;
+		padding: 0.35rem 0.5rem;
+		font: inherit;
+		resize: vertical;
+	}
+	.lp-image-control {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.lp-clear-image {
+		font-size: 0.75rem;
+		padding: 0.2rem 0.5rem;
+		border-radius: 0.25rem;
+		border: 1px solid var(--sl-color-gray-4);
+		background: transparent;
+		color: var(--sl-color-gray-2);
+		cursor: pointer;
+	}
+	.lp-images-control {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		min-width: 240px;
+	}
+	/*
+	 * :global() — los chips (.lp-image-chip y sus hijos) los crea el <script> de
+	 * cliente con document.createElement, no el template de este componente, así
+	 * que nunca reciben el atributo data-astro-cid-* que Astro usa para scopear
+	 * este <style>. Sin :global(), estas reglas simplemente nunca matchean nada
+	 * y los chips caen a estilos default del navegador — un <img> sin tamaño
+	 * fijo se renderiza a su tamaño natural (cientos de px), lo que empuja todo
+	 * el layout de la página. Bug real encontrado construyendo el control
+	 * 'images' de Gallery.
+	 */
+	:global(.lp-images-list) {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+	:global(.lp-image-chip) {
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+		padding: 0.2rem 0.4rem;
+		border-radius: 0.25rem;
+		background: var(--sl-color-gray-5);
+		font-size: 0.75rem;
+	}
+	:global(.lp-image-chip img) {
+		width: 1.5rem;
+		height: 1.5rem;
+		object-fit: cover;
+		border-radius: 0.2rem;
+	}
+	:global(.lp-image-chip button) {
+		border: 0;
+		background: transparent;
+		color: var(--sl-color-gray-2);
+		cursor: pointer;
+		font-size: 0.9rem;
+		line-height: 1;
+	}
+	.lp-repeater-control {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		width: 100%;
+		padding-top: 0.5rem;
+		border-top: 1px dashed var(--sl-color-gray-5);
+		font-size: 0.8rem;
+	}
+	.lp-repeater-heading {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.6rem;
+	}
+	.lp-repeater-title {
+		font-weight: 600;
+	}
+	/* Bien visible a propósito — el usuario pidió explícitamente que quedara
+	   claro, de un vistazo, que estos campos aceptan cualquier cantidad de
+	   ítems (agregar/quitar), no un número fijo de slots. */
+	.lp-repeater-badge {
+		padding: 0.15rem 0.5rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--sl-color-accent) 25%, transparent);
+		color: var(--sl-color-white);
+		font-size: 0.7rem;
+		font-weight: 600;
+		white-space: nowrap;
+	}
+	.lp-repeater-add {
+		align-self: flex-start;
+		padding: 0.4rem 0.9rem;
+		border-radius: 0.375rem;
+		border: 1px dashed var(--sl-color-accent);
+		background: transparent;
+		color: var(--sl-color-white);
+		font-size: 0.8rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.lp-repeater-add:hover {
+		background: color-mix(in srgb, var(--sl-color-accent) 15%, transparent);
+	}
+	/* :global() — los ítems del repeater (y sus campos) los crea el <script> de
+	   cliente con document.createElement, igual que los chips de 'images' (ver
+	   nota de :global(.lp-image-chip) arriba) — nunca reciben el atributo de
+	   scope de Astro. */
+	:global(.lp-repeater-items) {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+	:global(.lp-repeater-item) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		gap: 0.75rem;
+		padding: 0.6rem 0.75rem;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.375rem;
+		background: var(--sl-color-gray-6);
+	}
+	:global(.lp-repeater-item-field) {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		font-size: 0.8rem;
+	}
+	:global(.lp-repeater-item-field input[type='text']) {
+		min-width: 180px;
+		padding: 0.3rem 0.5rem;
+	}
+	:global(.lp-repeater-item-field textarea) {
+		min-width: 220px;
+		padding: 0.3rem 0.5rem;
+		font: inherit;
+		resize: vertical;
+	}
+	:global(.lp-repeater-item-field select) {
+		min-width: 120px;
+		padding: 0.3rem 0.5rem;
+	}
+	:global(.lp-repeater-item-remove) {
+		align-self: center;
+		margin-left: auto;
+		padding: 0.3rem 0.6rem;
+		border-radius: 0.25rem;
+		border: 1px solid var(--sl-color-gray-4);
+		background: transparent;
+		color: var(--sl-color-gray-2);
+		cursor: pointer;
+		font-size: 0.75rem;
+	}
+	.lp-shadow-host {
+		display: block;
+		min-height: var(--lp-height);
+		overflow-x: auto;
+		/* Gutter visual entre el borde del preview y el componente real — sin
+		   esto el contenido queda pegado al borde de la caja, que se percibe
+		   como "sin terminar" (pedido explícito del usuario). Padding en el
+		   host (luz, no el shadow) — no toca `canvas.style.height`
+		   (needsFixedCanvasHeight sigue usando una altura definida para su
+		   propio contenido, esto solo agrega espacio alrededor). */
+		padding: 1.25rem;
+	}
+	/* El canvas sigue montado y renderizando (notifyUpdate sigue disparando
+	   normal para quien lo escuche, ej. GalleryInteractiveDemo) — solo no se
+	   muestra, para no duplicar visualmente un demo bespoke que ya está abajo. */
+	.live-preview--hide-canvas .lp-shadow-host {
+		display: none;
+	}
+	.lp-caption {
+		font-size: 0.8rem;
+		opacity: 0.7;
+		margin-top: 0.25rem;
+	}
+</style>
+
+<script>
+	// Un solo script compartido — Astro lo dedupea aunque <LivePreview> se use
+	// varias veces en la misma página. Descubre cada bloque por su marcado, no
+	// por variables inyectadas por instancia.
+	async function initLivePreview(block: HTMLElement) {
+		const id = block.dataset.previewId!;
+		const host = block.querySelector<HTMLDivElement>('.lp-shadow-host')!;
+		const payloadScript = document.querySelector<HTMLScriptElement>(
+			`script.lp-payload[data-preview-id="${id}"]`,
+		)!;
+		const { html: initialHtml, css } = JSON.parse(payloadScript.textContent!) as {
+			html: string;
+			css: string;
+		};
+		const form = block.querySelector<HTMLFormElement>('.lp-controls');
+
+		const shadow = host.attachShadow({ mode: 'open' });
+		const styleEl = document.createElement('style');
+		styleEl.textContent = css;
+		shadow.append(styleEl);
+		const canvas = document.createElement('div');
+		canvas.className = 'lp-canvas';
+		// min-height SIEMPRE (piso — evita un canvas vacío cuando el contenido
+		// real es más chico, ej. un ícono, o cuando el único contenido es un
+		// elemento `position:absolute` que no aporta nada al alto intrínseco del
+		// padre — ver HeroBadge más abajo). `height` real (no solo min-height)
+		// SOLO para componentes que declaran needsFixedCanvasHeight (ej. Slider,
+		// cuya cadena de height:100%/flex-stretch necesita que sus ancestros
+		// tengan una altura DEFINIDA, no un mínimo). La mayoría de secciones
+		// (About, grids, etc.) no son de altura fija — su contenido real puede
+		// ser más alto que --lp-height, y forzar `height` ahí lo recortaría (con
+		// overflow:hidden del contenedor) en vez de mostrarse completo. Bug real
+		// encontrado con Image-Text Split (contenido más alto, se recortaba) Y
+		// con Hero Badge (badge `position:absolute`, sin `height` ni `min-height`
+		// el canvas colapsaba a 0 y el badge no se veía) al construir el
+		// mecanismo genérico — un solo `height` fijo para todos no sirve para
+		// ningún caso real salvo Slider.
+		canvas.style.minHeight = 'var(--lp-height, 320px)';
+		if (block.dataset.fixedHeight === 'true') {
+			canvas.style.height = 'var(--lp-height, 320px)';
+		}
+		canvas.style.position = 'relative';
+		// El canvas debe estar CONECTADO (ya dentro del shadow, que ya está
+		// dentro del documento real vía `host`) antes de insertarle HTML con
+		// <script>s propios — un <script> insertado en un árbol todavía
+		// desconectado nunca dispara su "prepare the script element" (no
+		// ejecuta). Por eso el append va ANTES de poblar el canvas, no después.
+		shadow.append(canvas);
+
+		// El HTML de la Container API puede traer su propio <script> (ej.
+		// Contact Section, que intercepta el submit del form) — innerHTML NUNCA
+		// ejecuta <script>s insertados así (comportamiento estándar del DOM), por
+		// lo que ese comportamiento real quedaba invisible en el preview (bug
+		// real encontrado probando el envío del formulario de Contact Section:
+		// sin el intercept, el <form> hacía un submit nativo a /api/submit-form/,
+		// un 404). Fix: recrear cada <script> con document.createElement para que
+		// el navegador lo corra de verdad. `executedScripts` deduplica por
+		// contenido — la mayoría de estos scripts registran listeners GLOBALES
+		// en `document` (delegados, no atados a un nodo puntual), así que
+		// re-ejecutarlos en cada `update()` (cada vez que el usuario toca un
+		// control) apilaría el mismo listener una y otra vez; ejecutar una sola
+		// vez por contenido alcanza porque el listener ya activo sigue
+		// funcionando sobre cualquier <form> nuevo que aparezca después con la
+		// misma action.
+		//
+		// Segundo problema real, más profundo: aunque el script ya se ejecute,
+		// sigue escuchando en `document` (como en producción, donde el form
+		// vive directo en el documento) — pero acá vive dentro de un Shadow
+		// Root a propósito (aislamiento de CSS). Comprobado empíricamente: el
+		// evento 'submit' NO es `composed`, así que ni siquiera llega a
+		// `document` (un listener de captura ahí con preventDefault() nunca se
+		// dispara). En vez de tocar el componente real para que use
+		// composedPath() (cambiaría su comportamiento de producción por algo
+		// que solo hace falta acá), se redirige la suscripción en el origen:
+		// mientras el <script> corre, se intercepta document.addEventListener/
+		// removeEventListener para que cualquier listener que el script
+		// registre en `document` quede realmente en `shadow` — ahí SÍ ve el
+		// form real sin problema de composed/retargeting, porque vive en el
+		// mismo árbol que el target. Genérico: sirve para cualquier componente
+		// futuro que delegue eventos en `document`, sin tocar su código.
+		//
+		// Tercer problema real: en dev, Astro sirve el <script> de un .astro
+		// como MÓDULO EXTERNO (`type="module" src="/_astro/..."`), no inline —
+		// comprobado empíricamente inspeccionando el nodo (0 hijos de texto,
+		// atributos `type`+`src`). Un módulo externo ejecuta ASYNC, después de
+		// su fetch — restaurar el parche de document.addEventListener de forma
+		// síncrona (en un try/finally alrededor de solo el replaceWith) cerraba
+		// la ventana antes de que el módulo llegara a registrar nada, y el
+		// listener real terminaba otra vez en el `document` de verdad. Fix: si
+		// el script tiene `src`, el parche se mantiene activo hasta su evento
+		// 'load'/'error', no hasta el final del replaceWith síncrono.
+		// `setCanvasHtml` devuelve una Promise que resuelve cuando TODOS los
+		// scripts (inline y externos) terminaron de correr.
+		const executedScripts = new Set<string>();
+		function setCanvasHtml(html: string): Promise<void> {
+			canvas.innerHTML = html;
+			const pending: Promise<void>[] = [];
+			canvas.querySelectorAll('script').forEach((oldScript) => {
+				const key = oldScript.getAttribute('src') || oldScript.textContent || '';
+				if (executedScripts.has(key)) {
+					oldScript.remove();
+					return;
+				}
+				executedScripts.add(key);
+
+				const realAdd = document.addEventListener.bind(document);
+				const realRemove = document.removeEventListener.bind(document);
+				document.addEventListener = shadow.addEventListener.bind(shadow) as typeof document.addEventListener;
+				document.removeEventListener = shadow.removeEventListener.bind(shadow) as typeof document.removeEventListener;
+				const restore = () => {
+					document.addEventListener = realAdd;
+					document.removeEventListener = realRemove;
+				};
+
+				const newScript = document.createElement('script');
+				for (const attr of Array.from(oldScript.attributes)) {
+					newScript.setAttribute(attr.name, attr.value);
+				}
+				newScript.textContent = oldScript.textContent;
+
+				if (newScript.getAttribute('src')) {
+					pending.push(
+						new Promise<void>((resolve) => {
+							newScript.addEventListener('load', () => {
+								restore();
+								resolve();
+							});
+							newScript.addEventListener('error', () => {
+								restore();
+								resolve();
+							});
+						}),
+					);
+					oldScript.replaceWith(newScript);
+				} else {
+					oldScript.replaceWith(newScript);
+					restore();
+				}
+			});
+			return Promise.all(pending).then(() => undefined);
+		}
+		await setCanvasHtml(initialHtml);
+
+		// Otros scripts del catálogo (ej. el demo de paralax de Slider, o el de
+		// hidratación real de Gallery) escuchan esto para re-engancharse cada vez
+		// que el canvas cambia de contenido — composed:true para que cruce el
+		// límite del Shadow DOM si hiciera falta. `props` son los props REALES
+		// con los que se pidió el último render (undefined en el render inicial,
+		// antes de que exista un fetch) — así un demo bespoke que necesita
+		// hidratar su propio componente (no solo leer el HTML ya renderizado, ej.
+		// Gallery.svelte) puede usar los mismos datos sin tener que re-derivarlos
+		// leyendo el DOM del shadow.
+		const notifyUpdate = (props?: Record<string, unknown>) => {
+			block.dispatchEvent(
+				new CustomEvent('livepreview:update', {
+					detail: { id, shadow, canvas, props },
+					bubbles: true,
+					composed: true,
+				}),
+			);
+		};
+		// NOTA: esta primera llamada puede pasar ANTES de que un demo bespoke
+		// que aparece después en la página (ej. AnnouncementBannerModalMount)
+		// llegue a registrar su propio `document.addEventListener
+		// ('livepreview:update', ...)` — los <script type="module"> deferred
+		// de Astro no garantizan en la práctica que ya esté escuchando en
+		// este punto del ciclo de carga (bug real encontrado con Announcement
+		// Banner: el botón inicial no re-enganchaba hasta el primer cambio de
+		// control). Un `setTimeout(0)` acá NO alcanza a resolverlo de forma
+		// confiable — el fix real va del lado de quien escucha: buscar el
+		// shadow root ya existente por DOM y reintentar hasta encontrarlo, en
+		// vez de depender solo de este evento para el estado inicial (ver
+		// AnnouncementBannerModalMount.astro).
+		notifyUpdate();
+
+		if (!form) return;
+		// Un <form> real dispararía submit/reload nativo al presionar Enter — no
+		// se envía a ningún lado, solo se usa por la conveniencia de leer los
+		// controles por nombre vía form.elements.
+		form.addEventListener('submit', (e) => e.preventDefault());
+
+		// Los <input type="file"> no exponen su contenido vía .value (el navegador
+		// solo da una ruta falsa por seguridad) — se leen aparte a data: URL +
+		// dimensiones reales, y se guardan acá para que `update()` los incluya.
+		const imageValues: Record<string, { url: string; width: number; height: number } | null> = {};
+		function readImageFile(file: File): Promise<{ url: string; width: number; height: number }> {
+			return new Promise((resolve, reject) => {
+				const reader = new FileReader();
+				reader.onerror = () => reject(reader.error);
+				reader.onload = () => {
+					const url = reader.result as string;
+					const img = new Image();
+					img.onload = () => resolve({ url, width: img.naturalWidth, height: img.naturalHeight });
+					img.onerror = () => reject(new Error('No se pudo leer la imagen'));
+					img.src = url;
+				};
+				reader.readAsDataURL(file);
+			});
+		}
+		form.querySelectorAll<HTMLInputElement>('input[type="file"]').forEach((fileInput) => {
+			fileInput.addEventListener('change', async () => {
+				const file = fileInput.files?.[0];
+				imageValues[fileInput.name] = file ? await readImageFile(file) : null;
+				update();
+			});
+		});
+		// Un <input type="file"> no se puede "vaciar" solo reseteando su .value
+		// visualmente de forma consistente entre navegadores para que el usuario
+		// vea que ya no hay archivo — se limpia explícito con este botón, tanto el
+		// input como el estado interno que `update()` realmente lee.
+		form.querySelectorAll<HTMLButtonElement>('.lp-clear-image').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				const name = btn.dataset.clears!;
+				imageValues[name] = null;
+				const fileInput = form.elements.namedItem(name) as HTMLInputElement | null;
+				if (fileInput) fileInput.value = '';
+				update();
+			});
+		});
+
+		// Controles 'images' (varias) — no son <input> nativos con `name` propio
+		// (el <input type=file> interno solo AGREGA una imagen a la vez, no
+		// representa el valor final), así que se manejan aparte de
+		// form.elements: `imagesValues` guarda el array real por control, y
+		// `update()` los inyecta a mano en los props.
+		const imagesValues: Record<string, { url: string; width: number; height: number }[]> = {};
+		form.querySelectorAll<HTMLElement>('.lp-images-control').forEach((control) => {
+			const name = control.dataset.imagesName!;
+			imagesValues[name] = [];
+			const addInput = control.querySelector<HTMLInputElement>('.lp-images-add-input')!;
+			const list = control.querySelector<HTMLDivElement>('.lp-images-list')!;
+
+			const renderChips = () => {
+				list.innerHTML = '';
+				imagesValues[name].forEach((img, i) => {
+					const chip = document.createElement('span');
+					chip.className = 'lp-image-chip';
+					const thumb = document.createElement('img');
+					thumb.src = img.url;
+					thumb.alt = '';
+					const removeBtn = document.createElement('button');
+					removeBtn.type = 'button';
+					removeBtn.textContent = '×';
+					removeBtn.addEventListener('click', () => {
+						imagesValues[name].splice(i, 1);
+						renderChips();
+						update();
+					});
+					chip.append(thumb, removeBtn);
+					list.append(chip);
+				});
+			};
+
+			addInput.addEventListener('change', async () => {
+				const files = Array.from(addInput.files ?? []);
+				addInput.value = '';
+				if (files.length === 0) return;
+				// Todas a la vez (multiple en el input) — subirlas de una en una era
+				// tedioso para probar un patrón que necesita varias imágenes (ej. la
+				// grilla de 3 columnas de Gallery). Un solo `update()` al final, no
+				// uno por archivo.
+				const read = await Promise.all(files.map(readImageFile));
+				imagesValues[name].push(...read);
+				renderChips();
+				update();
+			});
+		});
+
+		// Controles 'repeater' — arreglos de sub-documentos editables (ej.
+		// items[] de Feature Grid/Process Steps). Los inputs de cada ítem NO
+		// tienen `name` (para no colisionar con el loop genérico de
+		// form.elements de abajo, igual que el <input> de agregar de
+		// 'images') — se manejan aparte: `repeaterValues` guarda el array
+		// real por control, `update()` lo inyecta a mano en los props. Los
+		// campos de texto SÍ disparan el 'input' nativo del navegador, así
+		// que el listener global de abajo (`form.addEventListener('input',
+		// ...)`) ya los agarra por burbujeo — no hace falta debounce propio acá.
+		const repeaterValues: Record<string, Record<string, unknown>[]> = {};
+		form.querySelectorAll<HTMLElement>('.lp-repeater-control').forEach((control) => {
+			const name = control.dataset.repeaterName!;
+			const itemLabel = control.dataset.itemLabel!;
+			const fields = JSON.parse(control.dataset.fields!) as {
+				name: string;
+				label: string;
+				type: 'text' | 'textarea' | 'image' | 'select';
+				options?: string[];
+			}[];
+			const initial = JSON.parse(control.dataset.initial!) as Record<string, unknown>[];
+			repeaterValues[name] = initial.map((item) => ({ ...item }));
+			const list = control.querySelector<HTMLDivElement>('.lp-repeater-items')!;
+			const addBtn = control.querySelector<HTMLButtonElement>('.lp-repeater-add')!;
+
+			const renderItems = () => {
+				list.innerHTML = '';
+				repeaterValues[name].forEach((itemValue, index) => {
+					const itemEl = document.createElement('div');
+					itemEl.className = 'lp-repeater-item';
+					for (const field of fields) {
+						const fieldWrap = document.createElement('label');
+						fieldWrap.className = 'lp-repeater-item-field';
+						const labelText = document.createElement('span');
+						labelText.textContent = field.label;
+						fieldWrap.append(labelText);
+						if (field.type === 'text') {
+							const input = document.createElement('input');
+							input.type = 'text';
+							input.value = String(itemValue[field.name] ?? '');
+							input.addEventListener('input', () => {
+								itemValue[field.name] = input.value;
+							});
+							fieldWrap.append(input);
+						} else if (field.type === 'textarea') {
+							const textarea = document.createElement('textarea');
+							textarea.rows = 3;
+							textarea.value = String(itemValue[field.name] ?? '');
+							textarea.addEventListener('input', () => {
+								itemValue[field.name] = textarea.value;
+							});
+							fieldWrap.append(textarea);
+						} else if (field.type === 'image') {
+							const wrap = document.createElement('span');
+							wrap.className = 'lp-image-control';
+							const fileInput = document.createElement('input');
+							fileInput.type = 'file';
+							fileInput.accept = 'image/*';
+							fileInput.addEventListener('change', async () => {
+								const file = fileInput.files?.[0];
+								itemValue[field.name] = file ? await readImageFile(file) : null;
+								update();
+							});
+							const clearBtn = document.createElement('button');
+							clearBtn.type = 'button';
+							clearBtn.className = 'lp-clear-image';
+							clearBtn.textContent = 'Quitar imagen';
+							clearBtn.addEventListener('click', () => {
+								itemValue[field.name] = null;
+								fileInput.value = '';
+								update();
+							});
+							wrap.append(fileInput, clearBtn);
+							fieldWrap.append(wrap);
+						} else if (field.type === 'select') {
+							const select = document.createElement('select');
+							for (const opt of field.options ?? []) {
+								const optionEl = document.createElement('option');
+								optionEl.value = opt;
+								optionEl.textContent = opt;
+								if (itemValue[field.name] === opt) optionEl.selected = true;
+								select.append(optionEl);
+							}
+							select.addEventListener('input', () => {
+								itemValue[field.name] = select.value;
+							});
+							fieldWrap.append(select);
+						}
+						itemEl.append(fieldWrap);
+					}
+					const removeBtn = document.createElement('button');
+					removeBtn.type = 'button';
+					removeBtn.className = 'lp-repeater-item-remove';
+					removeBtn.textContent = `× Quitar ${itemLabel}`;
+					removeBtn.addEventListener('click', () => {
+						repeaterValues[name].splice(index, 1);
+						renderItems();
+						update();
+					});
+					itemEl.append(removeBtn);
+					list.append(itemEl);
+				});
+			};
+			renderItems();
+
+			addBtn.addEventListener('click', () => {
+				const blank: Record<string, unknown> = {};
+				for (const field of fields) {
+					blank[field.name] =
+						field.type === 'image' ? null : field.type === 'select' ? (field.options?.[0] ?? '') : '';
+				}
+				repeaterValues[name].push(blank);
+				renderItems();
+				update();
+			});
+		});
+
+		let timer: ReturnType<typeof setTimeout>;
+		const update = async () => {
+			const props: Record<string, unknown> = {};
+			for (const el of Array.from(form.elements) as (HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement)[]) {
+				if (!el.name) continue;
+				if (el instanceof HTMLInputElement && el.type === 'checkbox') {
+					props[el.name] = el.checked;
+				} else if (el instanceof HTMLInputElement && el.type === 'file') {
+					props[el.name] = imageValues[el.name] ?? null;
+				} else if (
+					(el instanceof HTMLInputElement && el.type === 'text') ||
+					el instanceof HTMLTextAreaElement
+				) {
+					// Si el usuario borra todo, vuelve al valor con el que se
+					// renderizó el control (el.defaultValue no cambia aunque el
+					// usuario edite .value) — sin esto, un campo vacío se manda
+					// tal cual y algunos componentes se quedan sin nada que mostrar.
+					props[el.name] = el.value.trim() === '' ? el.defaultValue : el.value;
+				} else {
+					props[el.name] = el.value;
+				}
+			}
+			for (const [name, arr] of Object.entries(imagesValues)) {
+				props[name] = arr;
+			}
+			for (const [name, arr] of Object.entries(repeaterValues)) {
+				props[name] = arr;
+			}
+			const res = await fetch(`/api/render/${id}`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(props),
+			});
+			if (res.ok) {
+				await setCanvasHtml(await res.text());
+				notifyUpdate(props);
+			}
+		};
+		form.addEventListener('input', () => {
+			clearTimeout(timer);
+			timer = setTimeout(update, 150);
+		});
+
+		// Al salir del campo (no mientras escribe, para no pelear con el usuario
+		// borrando texto para escribir algo nuevo) — si quedó vacío, restaura el
+		// valor visible en el input para que coincida con lo que ya se ve en el
+		// preview (que desde `update` cae al mismo default cuando está vacío).
+		form.addEventListener('focusout', (e) => {
+			const el = e.target;
+			const isTextLike = (el instanceof HTMLInputElement && el.type === 'text') || el instanceof HTMLTextAreaElement;
+			if (isTextLike && el.value.trim() === '') {
+				el.value = el.defaultValue;
+			}
+		});
+	}
+
+	document.querySelectorAll<HTMLElement>('.live-preview').forEach(initLivePreview);
+</script>

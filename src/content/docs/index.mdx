@@ -1,0 +1,46 @@
+---
+title: Catálogo de Componentes — Master Clone
+description: Qué features de _library/ existen en sitio-cms-mongo, cuándo usar cada una, y su estado real.
+template: splash
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+Este es el catálogo técnico de features reutilizables (`_library/`) del **Master Clone**
+(`sitio-cms-mongo`) — el proyecto base del que salen todos los proyectos de cliente.
+
+:::note[Solo para developers]
+Esta documentación **no viaja a ningún proyecto de cliente**. Vive únicamente aquí, en un
+repo hermano de `sitio-cms-mongo`, para que un clon nunca la reciba por accidente. Si buscas
+la guía para que un cliente use su propio sitio, esa vive dentro de cada proyecto — no aquí.
+:::
+
+:::caution[Esto es una base, no un contrato]
+Cada feature documentada acá es un **punto de partida genérico**, probado y funcional, no un
+componente terminado para producción tal cual. En la práctica, casi todo proyecto de cliente
+va a requerir ajustar diseño, campos o comportamiento — este catálogo existe para decidir
+**con qué arrancar**, no para asumir que se va a usar sin cambios.
+:::
+
+<CardGrid>
+	<Card title="Estado en vivo" icon="pencil">
+		La tabla en **Estado en vivo de `_library/`** se genera leyendo `manifest.json` de cada
+		feature directo del master-clone — nunca es una copia, siempre está al día.
+	</Card>
+	<Card title="Componentes" icon="open-book">
+		Cada página en **Componentes** explica qué es, cuándo usarlo, sus campos, un ejemplo, y
+		notas técnicas de implementación.
+	</Card>
+</CardGrid>
+
+## Cómo mantener este catálogo al día
+
+1. Un feature nuevo se construye en `sitio-cms-mongo/cms/src/_library/<feature>/` — con su
+   `manifest.json` (metadata que consume `library.mjs`/`registry.ts`) siguiendo
+   `cms/src/_library/manifest.template.json`.
+2. Al terminarlo, se agrega su página narrativa acá, en
+   `src/content/docs/components/<feature>.md` — qué es, cuándo usarlo, campos, ejemplo, notas.
+   El `manifest.json` no se copia — la tabla de **Estado en vivo** ya lo lee en tiempo real.
+3. Si el feature todavía no tiene wiring de CMS activo, o su diseño no está resuelto (como
+   `product-menu` hoy), se documenta igual pero marcado explícitamente como pendiente — ver
+   **Infraestructura y pendientes**.

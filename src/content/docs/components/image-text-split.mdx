@@ -1,0 +1,81 @@
+---
+title: "Image-Text Split"
+description: "Bloque clásico de dos columnas — galería de imágenes + texto (saludo/título/richText/destacado) + CTA, tipo 'Sobre nosotros'."
+---
+
+import LivePreview from '../../../components/LivePreview.astro';
+
+:::tip[Base reutilizable, no un contrato]
+Esto es un punto de partida genérico y probado — en la práctica, la mayoría de proyectos de cliente ajustan diseño y/o campos antes de usarlo. Sirve para decidir con qué arrancar, no para asumir que se va a usar tal cual.
+:::
+
+**Última actualización:** 2026-09-14
+**Versión:** 1.0.0
+**Estado:** ⏳ Sin campo activo en el CMS de este Master Clone todavía
+
+---
+
+## ¿Qué es?
+
+El clásico bloque "About" de dos columnas: una galería de imágenes de un lado, texto (saludo +
+título + richText + destacado opcional + CTA opcional) del otro. Pensado para secciones tipo
+"Sobre nosotros"/"Conócenos".
+
+---
+
+## ¿Cuándo usarlo?
+
+- ✅ Presentar la empresa/marca con texto + imagen(es)
+- ✅ Cualquier sección de dos columnas con un CTA opcional
+
+**No lo uses si:**
+- ❌ Necesitas varios elementos repetidos en grilla (usa **Feature Grid**)
+- ❌ Necesitas una galería pura sin texto estructurado (usa **Gallery**)
+
+---
+
+## Cómo activarlo
+
+Este feature no tiene un campo montado en ningún global de este Master Clone hoy — el componente
+en `site/src/_library/image-text-split/` está listo, pero falta:
+
+1. Agregar un campo (ej. `imageTextSplit`, con la forma de `data` que se ve abajo) al global
+   donde quieras montarlo (ej. `PageHome.ts`).
+2. `pnpm payload generate:types`.
+3. Pasar ese campo como `data` a `<ImageTextSplit id="image-text-split" data={data} />`.
+
+---
+
+## Parámetros (`data` que recibe `ImageTextSplit.astro`)
+
+:::note[🔁 `images[]` es de varias — sin límite fijo]
+Es un campo `hasMany` real: se pueden agregar tantas imágenes como se necesiten y quitar cualquiera
+en cualquier momento — no hay un número fijo. El control "Imágenes (columna izquierda)" del
+preview de abajo deja elegir varios archivos a la vez y quitar cada uno individualmente.
+:::
+
+| Parámetro | Tipo | Descripción | Requerido |
+|---|---|---|---|
+| **saludo** | string | Etiqueta corta arriba del título (ej. "Sobre nosotros") | ❌ No |
+| **h2** | string | Título principal | ❌ No |
+| **text** | richText | Texto de introducción (varios párrafos) | ❌ No |
+| **destacado** | string | Línea final destacada, con separador visual | ❌ No |
+| **cta_text / cta_link** | string | Botón opcional — necesita ambos para mostrarse | ❌ No |
+| **images[]** 🔁 | array (`hasMany`) | Imágenes de la columna visual — cualquier cantidad (array de sub-documentos `{ image }`, no un array plano) | ❌ No |
+
+---
+
+## Preview, uso y código
+
+<LivePreview id="image-text-split" height={480} />
+
+---
+
+## Notas técnicas
+
+- `site/src/_library/image-text-split/` tiene `ImageTextSplit.astro` (único archivo — sin JS de
+  cliente) + `ImageTextSplit.css`.
+- Componente puramente de presentación — no depende de otro feature de `_library/`.
+- Usa `Section.astro` (`_core/layouts/`) como wrapper — mismo patrón de `id`/fondo que otros
+  bloques de sección completos.
+- En mobile (`max-width: 767px`) la columna de imágenes pasa arriba del texto (`order: -1`).
